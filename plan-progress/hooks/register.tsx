@@ -191,31 +191,48 @@ let sid = ''
 let home = ''
 let planN = 0
 
-const isTodoStatus = (v: unknown): v is TodoStatus => v === 'pending' || v === 'in_progress' || v === 'completed'
+type Source = { goal: string; items: Todo[]; startedAt: number }
 
 /**
- * O plano que outro mod grava em `~/.claude/mods-state/plan-<sessão>.json` (título e passos com status).
- * Lido a cada desenho; nunca lança: sem arquivo, ou com um arquivo quebrado, a fonte simplesmente não conta.
+ * O plano atual do chat, da fonte mais específica para a mais geral: ledger do superpowers,
+ * plano do TodoWrite, lista do TaskCreate. É a única escolha de fonte: o painel e o arquivo
+ * compartilhado usam a mesma.
  */
-async function readPlanFile($: EngineInterface): Promise<{ goal: string; items: Todo[]; startedAt: number } | null> {
-  if (!sid || !home) return null
+async function currentSource($: EngineInterface): Promise<Source | null> {
+  const sdd = await refreshLedger($).catch(() => null)
+  const stamp = await $.clock.now()
+  const current = await read($, plan)
+  const tracked = await read($, tasks)
+  return isLedgerShown(sdd, stamp)
+    ? { goal: sdd.title, items: fromLedger(sdd), startedAt: sdd.seenAt }
+    : current !== null && current.todos.length > 0
+      ? { goal: current.goal, items: current.todos, startedAt: current.startedAt }
+      : tracked.length > 0
+        ? { goal: current?.goal ?? 'Sessão atual', items: fromTasks(tracked), startedAt: current?.startedAt ?? stamp }
+        : null
+}
+
+// Último conteúdo gravado: o arquivo só é regravado quando o plano muda.
+let lastPlanKey = ''
+
+/**
+ * Grava o plano do chat em `~/.claude/mods-state/plan-<sessão>.json`, o arquivo que o chat-inventory lê
+ * para o To-do. O plan-progress é o escritor: ele já coleta o plano de todas as fontes. Nunca lança.
+ */
+async function syncPlanFile($: EngineInterface) {
+  if (!sid || !home) return
   try {
-    const path = `${home}/.claude/mods-state/plan-${sid}.json`
-    if (!(await $.fs.exists(path))) return null
-    const json = JSON.parse(String(await $.fs.read(path))) as { title?: unknown; steps?: unknown; updatedAt?: unknown }
-    const items: Todo[] = []
-    for (const st of Array.isArray(json.steps) ? (json.steps as Record<string, unknown>[]) : []) {
-      if (typeof st.text === 'string' && isTodoStatus(st.status)) items.push({ content: st.text, status: st.status, activeForm: st.text })
-    }
-    if (!items.length) return null
-    const at = typeof json.updatedAt === 'string' ? Date.parse(json.updatedAt) : NaN
-    return {
-      goal: typeof json.title === 'string' && json.title ? json.title : 'Plano',
-      items,
-      startedAt: Number.isFinite(at) ? at : 0,
-    }
+    const src = await currentSource($)
+    if (src === null) return
+    const steps = src.items.map(t => ({ text: t.content, status: t.status }))
+    const key = JSON.stringify({ title: src.goal, steps })
+    if (key === lastPlanKey) return
+    lastPlanKey = key
+    await $.process.run(['mkdir', '-p', `${home}/.claude/mods-state`])
+    const updatedAt = new Date(await $.clock.now()).toISOString()
+    await $.fs.write(`${home}/.claude/mods-state/plan-${sid}.json`, `${JSON.stringify({ title: src.goal, steps, updatedAt }, null, 2)}\n`)
   } catch {
-    return null
+    // Gravar o arquivo nunca quebra o painel.
   }
 }
 
@@ -253,6 +270,7 @@ export const register: Register = on => {
       void readSwitch($).catch(() => undefined)
     })
     $.clock.every(5000, async () => {
+      void syncPlanFile($)
       const current = await refreshLedger($, { publish: true }).catch(() => null)
       const shown = isLedgerShown(current, await $.clock.now())
       if (shown || isActive(await read($, plan)) || (await read($, tasks)).some(t => t.status !== 'completed')) {
@@ -315,6 +333,7 @@ export const register: Register = on => {
       )
     }
     if (e.tool === 'Bash') await refreshLedger($, { force: true, publish: true }).catch(() => undefined)
+    if (['TodoWrite', 'TaskCreate', 'TaskUpdate'].includes(e.tool)) await syncPlanFile($)
     return result
   }).catch(($, e, next) => next(e))
 
@@ -323,22 +342,9 @@ export const register: Register = on => {
     if (off) return next(e)
     // O atom só serve para redesenhar quem lê; o valor vem da leitura (com cache).
     await read($, ledger)
-    const sdd = await refreshLedger($).catch(() => null)
     const stamp = await $.clock.now()
     const current = await read($, plan)
-    const tracked = await read($, tasks)
-
-    // Fontes, da mais específica para a mais geral: ledger do superpowers, arquivo do plano, TodoWrite, TaskCreate.
-    const file = await readPlanFile($)
-    const source = isLedgerShown(sdd, stamp)
-      ? { goal: sdd.title, items: fromLedger(sdd), startedAt: sdd.seenAt }
-      : file !== null
-        ? file
-        : current !== null && current.todos.length > 0
-          ? { goal: current.goal, items: current.todos, startedAt: current.startedAt }
-          : tracked.length > 0
-            ? { goal: current?.goal ?? 'Sessão atual', items: fromTasks(tracked), startedAt: current?.startedAt ?? stamp }
-            : null
+    const source = await currentSource($)
     if (source === null) return next(e)
 
     const els = $.ui.resolve(e)
