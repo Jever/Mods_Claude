@@ -75,7 +75,7 @@ O `mods` é opcional, mas é o único jeito de ligar e desligar os outros pela t
 
 Mostra acima do prompt quanto tempo falta até o cache do chat esfriar. O cache é o que deixa a próxima mensagem barata. Depois de esfriar, a próxima mensagem relê o chat inteiro pelo preço cheio.
 
-- **Contagem:** `◷ Cache aquecido 3:12` com uma barra que esvazia. Ao esfriar, mostra `❄ Frio há 7 min`.
+- **Contagem:** `◷ Cache aquecido 3:12` com uma barra que esvazia. Ao esfriar, mostra `❄ Frio há 7 min`. A duração (5 minutos ou 1 hora) vem do que o Claude gravou nas respostas do chat. Até a primeira resposta, o mod assume 5 minutos.
 - **Manter aquecido:** manda um ping pequeno cerca de 45 segundos antes de o cache esfriar. Para sozinho depois de 30 pings, depois de 2 horas, ou quando você envia uma mensagem. Também pelo comando `/keepwarm` e `/keepwarm off`.
 - **Limpar Sessão:** gera um briefing do chat, limpa a sessão e cola o briefing no prompt para você continuar em um chat limpo. Também pelo comando `/handoff`. `/handoff colar` recola o último briefing.
 - **Handoff automático:** `/autohandoff 75` faz o handoff sozinho quando o contexto chega a 75%. `/autohandoff off` desliga.
@@ -158,26 +158,19 @@ Mods instalados que o painel não conhece aparecem no fim da lista, com o nome d
 
 ## Imagens de uso
 
-As capturas de tela do uso real ainda não estão aqui. Elas mostram nomes de projetos e valores de custo, então precisam de uma revisão antes de entrar em um repositório público. Quando estiverem prontas, coloque em `docs/screenshots/` e troque os blocos abaixo por imagens.
+Capturas reais do uso, guardadas em `docs/screenshots/`.
 
-Como a faixa do cache-keeper aparece, em texto:
+A faixa do cache-keeper, com Aprimorar, os botões e a contagem:
 
-```
-[ Aprimorar ]
-[ Manter aquecido ] [ Limpar Sessão ]  ◷ Cache aquecido 3:12  ━━━━━━━━━━━━━━┄┄┄┄┄┄
-```
+![Faixa do cache-keeper acima do prompt, com Aprimorar, Manter aquecido, Limpar Sessão e a contagem](docs/screenshots/cache-faixa.png)
 
-Como o painel do plano aparece, em texto:
+O painel do plano, com a caixa de progresso e a lista de tarefas:
 
-```
-┌──────────────────────────────────────────────┐
-│ Plano: Migração do módulo de pagamentos      │
-│ ━━━━━━━━━━━━━━━━━━━━━━━━┄┄┄┄┄┄┄┄  60% (3/5)  │
-│ ✓ Mapear os endpoints                        │
-│ ● Escrever os testes de contrato             │
-│ ○ Migrar o webhook                           │
-└──────────────────────────────────────────────┘
-```
+![Caixa do plano no painel de subagentes, com a barra de progresso e as tarefas](docs/screenshots/plano.png)
+
+O painel de subagentes, com os totais e um card por subagente:
+
+![Painel Subagentes com os totais, os cards em execução e os concluídos](docs/screenshots/subagentes.png)
 
 <a id="solucao-de-problemas"></a>
 ## Solução de problemas
@@ -185,7 +178,8 @@ Como o painel do plano aparece, em texto:
 - **Não aparece nada acima do prompt:** confira no `/mods` se o mod está On. Depois rode `/reload-plugins`.
 - **O painel não abre sozinho:** o terminal pode estar com menos de 144 colunas. Use `/subagentes`.
 - **O cache não mostra contagem:** é preciso ter pelo menos uma resposta do Claude no chat. Antes disso aparece `◷ Cache ainda não`.
-- **`python3` não encontrado:** o cache-keeper continua funcionando, mas assume cache de 5 minutos.
+- **A contagem mostra 5 minutos mesmo com assinatura:** o mod só mostra o que o Claude gravou no chat. Se as respostas gravaram cache de 5 minutos, a contagem fica em 5. Dá para conferir no log `~/.claude/mods-logs/cache-keeper.log`, e em `~/.claude/projects/` nas linhas `ephemeral_1h_input_tokens` e `ephemeral_5m_input_tokens`.
+- **`python3` não encontrado:** o cache-keeper continua funcionando, mas assume cache de 5 minutos. Instale o `python3` e reinicie o Claude Code.
 - **Duas listas de tarefas aparecem ao mesmo tempo:** é esperado, porque o chat-inventory e o plan-progress mostram o mesmo plano. Desligue um deles no `/mods`.
 
 ## Desenvolvimento
