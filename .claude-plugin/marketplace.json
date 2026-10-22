@@ -1,0 +1,9 @@
+{
+  "name": "meus-mods",
+  "owner": { "name": "jever" },
+  "plugins": [
+    { "name": "cache-keeper", "source": "./cache-keeper", "description": "Botão Limpar Sessão (handoff com briefing) e aviso de qualidade quando o contexto enche." },
+    { "name": "prompt-enhancer", "source": "./prompt-enhancer", "description": "Botão Aprimorar acima do prompt: reescreve o rascunho sem enviar." },
+    { "name": "plan-progress", "source": "./plan-progress", "description": "Painel com objetivo, fase, checklist do TodoWrite, barra de progresso e tempo." }
+  ]
+}
