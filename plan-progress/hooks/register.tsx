@@ -35,7 +35,6 @@ async function readSwitch($: EngineInterface) {
   }
 }
 
-const PHASES: Phase[] = ['pesquisa', 'planejamento', 'construção', 'teste', 'auditoria']
 const TEST_COMMAND = /\b(pytest|jest|vitest|mocha|tsc|mypy|ruff|eslint|go test|cargo test|npm (run )?test|pnpm test|yarn test|playwright test|plugin (test|validate))\b/
 const AUDIT_NAME = /review|audit|security|auditor|reviewer/i
 /** Ledger concluído some da faixa depois deste tempo sem mudança. */
@@ -318,16 +317,11 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        <Box>
+        <Text wrap="truncate-end">
           <Text bold>Plano: </Text>
-          <Text>{clip(source.goal, 70)}  </Text>
-          {phase !== undefined &&
-            PHASES.map(p => (
-              <Text key={p} bold={p === phase} dimColor={p !== phase}>
-                {p === phase ? `[${p}]` : p}{' '}
-              </Text>
-            ))}
-        </Box>
+          <Text>{clip(source.goal, 70)}</Text>
+        </Text>
+        {phase !== undefined && <Text dimColor>Fase: {phase}</Text>}
         <Text color={isDone ? 'success' : undefined}>
           {bar(percent)} {percent}% ({done}/{source.items.length})  {elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)}
         </Text>

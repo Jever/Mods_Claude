@@ -442,19 +442,18 @@ export const register: Register = (on, options) => {
     const keepLabel = w ? 'Parar aquecimento' : 'Manter aquecido'
     const handoffLabel = busy ? 'Gerando...' : 'Limpar Sessão'
 
-    // Abaixo do que já está acima do prompt, para não espremer um banner de várias linhas (o plano).
+    // Uma linha só, ao lado do que já está acima do prompt (Aprimorar). O plano saiu dessa faixa,
+    // então nenhum banner de várias linhas é espremido aqui.
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="row" gap={1}>
         {below}
-        <Box flexDirection="row" gap={1}>
-          <Button key="keepwarm" label={keepLabel} onPress={() => toggleWarm($)} />
-          <Button key="handoff" label={handoffLabel} hotkey="h" onPress={() => handoff($, true)} />
-          <Text color={timerColor}>{timerCell}</Text>
-          <Text>
-            <Text color={timerColor}>{'━'.repeat(filled)}</Text>
-            <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
-          </Text>
-        </Box>
+        <Button key="keepwarm" label={keepLabel} onPress={() => toggleWarm($)} />
+        <Button key="handoff" label={handoffLabel} hotkey="h" onPress={() => handoff($, true)} />
+        <Text color={timerColor}>{timerCell}</Text>
+        <Text>
+          <Text color={timerColor}>{'━'.repeat(filled)}</Text>
+          <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
+        </Text>
       </Box>
     )
   })
