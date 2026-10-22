@@ -1,0 +1,14 @@
+{
+  "name": "cache-keeper",
+  "version": "0.1.0",
+  "description": "Botão Limpar Sessão acima do prompt (handoff com briefing) e aviso de qualidade quando o contexto enche.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "warnPercent": {
+      "type": "string",
+      "title": "Aviso de qualidade (% de contexto)",
+      "description": "Percentual de contexto a partir do qual a qualidade pode piorar e o mod avisa.",
+      "default": "60"
+    }
+  }
+}
