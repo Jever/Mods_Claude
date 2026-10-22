@@ -1,0 +1,14 @@
+{
+  "name": "prompt-enhancer",
+  "version": "0.1.0",
+  "description": "Botão Aprimorar acima do prompt: reescreve o rascunho na caixa de prompt sem enviar.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "model": {
+      "type": "string",
+      "title": "Modelo da reescrita",
+      "description": "Alias ou id do modelo que reescreve o prompt (ex: sonnet, haiku).",
+      "default": "sonnet"
+    }
+  }
+}
