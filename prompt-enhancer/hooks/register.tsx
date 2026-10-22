@@ -3,6 +3,32 @@ import type { EngineInterface, Register } from 'claude-code'
 
 const isBusy = atom({ plugin: 'prompt-enhancer', key: 'isBusy' } as const, false)
 
+// O switchboard /mods desliga o mod em todos os chats pelo switches.json.
+const NAME = 'prompt-enhancer'
+let off = false
+
+const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
+
+async function readSwitch($: EngineInterface) {
+  let nowOff = off
+  try {
+    const path = switchesPath($)
+    if (await $.fs.exists(path)) {
+      const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
+      nowOff = json[NAME] === false
+    }
+  } catch {
+    // Um arquivo quebrado não muda nada.
+  }
+  if (nowOff === off) return
+  off = nowOff
+  try {
+    $.ui.invalidate('ui.render')
+  } catch {
+    // O próximo redesenho acontece de qualquer forma.
+  }
+}
+
 const MAX_CONTEXT_CHARS = 4000
 
 const SYSTEM = `Você reescreve rascunhos de prompt para um assistente de código (Claude Code).
@@ -74,6 +100,10 @@ export const register: Register = (on, options) => {
   const model = typeof options?.model === 'string' && options.model ? options.model : 'sonnet'
 
   on('session.start', async ($, e, next) => {
+    await readSwitch($).catch(() => undefined)
+    $.clock.every(3000, () => {
+      void readSwitch($).catch(() => undefined)
+    })
     await $.command.register({
       name: 'aprimorar',
       description: 'Reescreve o rascunho do prompt (sem enviar). Aceita o rascunho como argumento.',
@@ -83,13 +113,14 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'aprimorar' }, async ($, e) => {
+    if (off) return { text: 'O Prompt Enhancer está desligado. Ligue no /mods.' }
     const draft = e.args.trim() || (await $.prompt.read()).text
     void enhance($, model, draft)
     return { text: 'Aprimorando o prompt, o resultado vai para a caixa de prompt.' }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) return next(e)
+    if (off || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const busy = await read($, isBusy)
     const below = await next(e)
