@@ -1,6 +1,6 @@
 {
   "name": "cache-keeper",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Acima do prompt: contagem até o cache esfriar, Manter aquecido (ping antes de esfriar) e botão Limpar Sessão (handoff com briefing). Avisa de qualidade quando o contexto enche.",
   "types": "./types/index.d.ts",
   "userConfig": {

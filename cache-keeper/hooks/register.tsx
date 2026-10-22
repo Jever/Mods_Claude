@@ -436,9 +436,8 @@ export const register: Register = (on, options) => {
     // empurrar os botões, e a faixa não pula de lugar enquanto o tempo passa.
     const cols = Math.max(80, e.props.bodyColumns || 0)
     const TIMER_W = 24
-    const KEEP_W = 22
-    const HANDOFF_W = 18
-    const BAR_W = Math.min(BAR, cols - TIMER_W - KEEP_W - HANDOFF_W - 3)
+    // Botões: 17 e 13 caracteres de rótulo, com colchetes e espaços; 3 espaços entre as partes.
+    const BAR_W = Math.min(BAR, cols - TIMER_W - 17 - 13 - 8 - 3)
 
     const turning = working || e.props.isWorking
     const left = c && c.lastEnd ? c.lastEnd + c.ttlMs - c.now : 0
@@ -468,43 +467,27 @@ export const register: Register = (on, options) => {
       note = warmLine(w, left)
     }
 
-    const row = (
-      <Box flexDirection="row" width={cols} gap={1}>
-        <Box width={TIMER_W}>
-          <Text color={timerColor} wrap="truncate-end">
-            {timer}
-          </Text>
-        </Box>
-        <Box width={BAR_W}>
+    // Larguras fixas por texto preenchido, não por Box com width: a árvore continua com a forma
+    // que o engine já aceitou, e os botões ficam na mesma coluna quando a contagem muda.
+    const timerCell = timer.padEnd(TIMER_W).slice(0, TIMER_W)
+    const keepLabel = (w ? 'Parar aquecimento' : 'Manter aquecido').padEnd(17)
+    const handoffLabel = (busy ? 'Gerando...' : 'Limpar Sessão').padEnd(13)
+
+    return (
+      <Box flexDirection="column">
+        {below}
+        <Box flexDirection="row" gap={1}>
+          <Text color={timerColor}>{timerCell}</Text>
           <Text>
             <Text color={timerColor}>{'━'.repeat(filled)}</Text>
             <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
           </Text>
+          <Button key="keepwarm" label={keepLabel} onPress={() => toggleWarm($)} />
+          <Button key="handoff" label={handoffLabel} hotkey="h" onPress={() => handoff($, true)} />
         </Box>
-        <Box width={KEEP_W}>
-          <Button key="keepwarm" label={w ? 'Parar aquecimento' : 'Manter aquecido'} onPress={() => toggleWarm($)} />
-        </Box>
-        <Box width={HANDOFF_W}>
-          <Button key="handoff" label={busy ? 'Gerando...' : 'Limpar Sessão'} hotkey="h" onPress={() => handoff($, true)} />
-        </Box>
-      </Box>
-    )
-
-    return (
-      <Box flexDirection="column" width={cols}>
-        {below}
-        {row}
-        <Box width={cols}>
-          {noteColor ? (
-            <Text color={noteColor} wrap="truncate-end">
-              {note}
-            </Text>
-          ) : (
-            <Text dimColor wrap="truncate-end">
-              {note}
-            </Text>
-          )}
-        </Box>
+        <Text color={noteColor} dimColor={!noteColor} wrap="truncate-end">
+          {note}
+        </Text>
       </Box>
     )
   })
