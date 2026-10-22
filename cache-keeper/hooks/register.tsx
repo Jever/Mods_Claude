@@ -129,12 +129,6 @@ const mmss = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-// De onde vem o tamanho do cache: a resposta da Anthropic ou uma estimativa antes da primeira.
-function lengthLabel(c: Clock) {
-  if (c.ttlSource === 'detected') return `cache de ${c.ttlMs === ONE_HOUR ? '1 h' : '5 min'}, conforme a última resposta da Anthropic`
-  return 'cache de 5 min, uma estimativa até a primeira resposta'
-}
-
 function ttl(): { ttlMs: number; ttlSource: Clock['ttlSource'] } {
   if (detected === '1h') return { ttlMs: ONE_HOUR, ttlSource: 'detected' }
   if (detected === '5m') return { ttlMs: FIVE_MIN, ttlSource: 'detected' }
@@ -253,16 +247,6 @@ async function ping($: EngineInterface, start: number) {
   if (n >= MAX_PINGS) await stopWarm($, `Manter aquecido parado após ${MAX_PINGS} pings. Digite /keepwarm para ligar de novo.`)
 }
 
-function warmLine(w: Warm, left: number): string {
-  const parts = ['Mantendo aquecido']
-  if (w.sending) parts.push(`enviando ping ${w.pings + 1}`)
-  else if (w.pings === 0) parts.push(`primeiro ping em ${mmss(left - LEAD)}`)
-  else parts.push(`ping ${w.pings}`, `próximo em ${mmss(left - LEAD)}`)
-  if (w.error) parts.push(`último ping falhou (${w.error}), tentando de novo`)
-  else if (w.pings > 0 && w.cold) parts.push(`o cache tinha esfriado, então o ping ${w.pings} escreveu ${short(w.write)} tokens de novo`)
-  else if (w.pings > 0) parts.push(`o último ping leu ${short(w.read)} tokens do cache`)
-  return parts.join(' · ')
-}
 
 async function log($: EngineInterface, line: string) {
   try {
@@ -432,61 +416,41 @@ export const register: Register = (on, options) => {
     const c = await getClock($)
     const w = await getWarm($)
 
-    // Sempre duas linhas, com larguras fixas: a contagem, a barra e os textos mudam sem
-    // empurrar os botões, e a faixa não pula de lugar enquanto o tempo passa.
-    const cols = Math.max(80, e.props.bodyColumns || 0)
+    // Uma linha: o que já está acima do prompt (Aprimorar), os botões e, à direita de todos, a contagem.
+    // Larguras fixas por texto preenchido, para a contagem e os rótulos não empurrarem uns aos outros.
     const TIMER_W = 24
-    // Botões: 17 e 13 caracteres de rótulo, com colchetes e espaços; 3 espaços entre as partes.
-    const BAR_W = Math.min(BAR, cols - TIMER_W - 17 - 13 - 8 - 3)
-
+    const BAR_W = BAR
     const turning = working || e.props.isWorking
     const left = c && c.lastEnd ? c.lastEnd + c.ttlMs - c.now : 0
-    const cost = c ? `${short(c.tokens)} tokens` : ''
     let timer = '◷ Cache ainda não'
     let timerColor: string | undefined
     let filled = 0
-    let note = 'O cache começa depois da primeira resposta do Claude.'
     if (turning) {
       timer = '◷ Respondendo...'
-      note = 'A resposta em andamento usa o cache.'
     } else if (c && c.lastEnd && left > 0) {
       const share = left / c.ttlMs
       filled = Math.max(1, Math.round(share * BAR_W))
       timerColor = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
       timer = `◷ Cache aquecido ${mmss(left)}`
-      note = `${lengthLabel(c)}. Responder agora relê ${cost} por 5 a 10% do custo.`
     } else if (c && c.lastEnd) {
       timerColor = COLD
       const minutes = Math.floor(-left / 60_000)
       timer = minutes < 1 ? '❄ Frio há menos de 1 min' : `❄ Frio há ${minutes} min`
-      note = `Sua próxima mensagem relê ${cost} pelo preço cheio.`
-    }
-    let noteColor: string | undefined
-    if (w && !turning) {
-      noteColor = w.cold || w.error ? BAD : COLD
-      note = warmLine(w, left)
     }
 
-    // Larguras fixas por texto preenchido, não por Box com width: a árvore continua com a forma
-    // que o engine já aceitou, e os botões ficam na mesma coluna quando a contagem muda.
     const timerCell = timer.padEnd(TIMER_W).slice(0, TIMER_W)
     const keepLabel = (w ? 'Parar aquecimento' : 'Manter aquecido').padEnd(17)
     const handoffLabel = (busy ? 'Gerando...' : 'Limpar Sessão').padEnd(13)
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="row" gap={1}>
         {below}
-        <Box flexDirection="row" gap={1}>
-          <Text color={timerColor}>{timerCell}</Text>
-          <Text>
-            <Text color={timerColor}>{'━'.repeat(filled)}</Text>
-            <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
-          </Text>
-          <Button key="keepwarm" label={keepLabel} onPress={() => toggleWarm($)} />
-          <Button key="handoff" label={handoffLabel} hotkey="h" onPress={() => handoff($, true)} />
-        </Box>
-        <Text color={noteColor} dimColor={!noteColor} wrap="truncate-end">
-          {note}
+        <Button key="keepwarm" label={keepLabel} onPress={() => toggleWarm($)} />
+        <Button key="handoff" label={handoffLabel} hotkey="h" onPress={() => handoff($, true)} />
+        <Text color={timerColor}>{timerCell}</Text>
+        <Text>
+          <Text color={timerColor}>{'━'.repeat(filled)}</Text>
+          <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
         </Text>
       </Box>
     )
