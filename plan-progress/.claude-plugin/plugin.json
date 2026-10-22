@@ -1,6 +1,6 @@
 {
   "name": "plan-progress",
-  "version": "0.3.0",
-  "description": "Painel acima do prompt com objetivo, fase, checklist (TodoWrite, TaskCreate ou ledger do plano), barra de progresso e tempo decorrido.",
+  "version": "0.4.0",
+  "description": "Painel acima do prompt com objetivo, fase, checklist (TodoWrite, TaskCreate ou ledger do plano), barra de progresso e tempo decorrido. Painel lateral com um card por subagente: bichinho, barra, passos e custo.",
   "types": "./types/index.d.ts"
 }

@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
+import { registerSubagents, startSubagents, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
 const now = atom({ plugin: 'plan-progress', key: 'now' } as const, 0)
@@ -183,11 +184,13 @@ const fromTasks = (list: readonly TrackedTask[]): Todo[] =>
 export const register: Register = on => {
   lastLedgerCheck = Number.NEGATIVE_INFINITY
   cachedLedger = null
+  registerSubagents(on, () => off)
 
   on('session.start', async ($, e, next) => {
     await update($, now, () => 0)
     await refreshLedger($, { force: true, publish: true }).catch(() => undefined)
     await readSwitch($).catch(() => undefined)
+    await startSubagents($, () => off)
     $.clock.every(3000, () => {
       void readSwitch($).catch(() => undefined)
     })
@@ -214,6 +217,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('tool.call', async ($, e, next) => {
+    trackSubagentCall($, () => off, e)
     const phase = phaseOf(e.tool, e as { command?: string; subagent_type?: string; skill?: string })
     if (phase !== null) {
       await update($, plan, p => (p === null || p.phase === phase ? p : { ...p, phase }))

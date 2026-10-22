@@ -34,6 +34,61 @@ test('sem TodoWrite a faixa não aparece', async ($, on) => {
   await ui.unmount()
 })
 
+// Os cards: dois subagentes ganham um card cada, um deles lê um arquivo, e depois os dois concluem.
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`dois subagentes ganham card, e depois os dois concluem (${surface})`, { timeoutMs: 30000 }, async ($, on) => {
+    const agents: { id: string; description: string; type: string; status: string }[] = []
+    const opened: string[] = []
+    noLedger(on)
+    on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+    on('command.register', async () => ({ value: undefined }) as never)
+    on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd: 0.42 } } }) as never)
+    on('fs.exists', async () => ({ value: false }) as never)
+    on('ui.toast', async () => ({ value: undefined }) as never)
+    on('ui.status', async () => ({ value: undefined }) as never)
+    on('ui.open', async ($, e) => {
+      opened.push((e as { id: string }).id)
+      return { value: { isPlaced: true } } as never
+    })
+    const clock = mock.clock(on, { now: 1_000_000 })
+    on('agent.spawn', async ($, e) => {
+      const { description, subagentType } = e as { description: string; subagentType: string }
+      const id = `agent-${agents.length + 1}`
+      agents.push({ id, description, type: subagentType, status: 'running' })
+      return { model: 'claude-opus-5-5', agentId: id } as never
+    })
+    on('agent.list', async () => ({ value: agents.map(a => ({ ...a })) }) as never)
+    on('tool.call', async () => ({ result: 'ok' }) as never)
+    on('turn.complete', async () => ({ text: '' }) as never)
+    await $.session.start({ source: 'startup', cwd: '/proj', surface, isInteractive: true } as never)
+
+    await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Ler as notas', subagentType: 'Explore', model: 'haiku' } as never)
+    await $.agent.spawn({ tool_use_id: 's2', prompt: 'x', description: 'Achar as faturas', subagentType: 'general-purpose', model: 'opus' } as never)
+    await clock.settle()
+    expect(opened, 'pane opened by itself').toContain('subagents')
+
+    // A chamada de ferramenta de um subagente vira passo no card dele.
+    const callTool = $.tool.call as unknown as (input: unknown) => Promise<unknown>
+    await callTool({ tool: 'Read', tool_use_id: 'c1', file_path: '/proj/notas.md', agentId: 'agent-1' })
+    await clock.advance(5_000)
+
+    const props = { title: 'Subagentes', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: {}, view: {} } as never
+    const v = await $.ui.mount({ plugin: 'plan-progress', surface, component: 'Pane', requestId: 'subagents', props })
+    expect(await v.find({ text: /Ler as notas/ }), 'first description').toBeDefined()
+    expect(await v.find({ text: /Achar as faturas/ }), 'second description').toBeDefined()
+    expect(await v.find({ text: /Passo 1 · Lendo notas\.md/ }), 'Read in words').toBeDefined()
+    expect(await v.find({ key: 'head-running' }), 'running group').toBeDefined()
+    expect(await v.find({ text: /\$0\.42/ }), 'chat cost from the engine').toBeDefined()
+
+    agents[0]!.status = 'completed'
+    agents[1]!.status = 'completed'
+    await clock.advance(2_100)
+    expect(await v.find({ key: 'head-finished' }), 'finished group after the poll').toBeDefined()
+    expect(await v.find({ key: 'head-running' }), 'running group gone').toBeUndefined()
+    await v.unmount()
+  })
+}
+
 test('desligado no /mods, a faixa não desenha nada próprio', async ($, on) => {
   mock.clock(on)
   noLedger(on)
