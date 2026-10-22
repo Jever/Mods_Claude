@@ -126,7 +126,7 @@ test('o painel abre uma vez por plano, quando ganha itens', async ($, on) => {
   expect(opened, 'opens once for the plan').toEqual(['subagents'])
 })
 
-test('TodoWrite mostra o progresso e o botão de checklist', async ($, on) => {
+test('TodoWrite mostra o progresso e a lista de to-do', async ($, on) => {
   mock.clock(on)
   noLedger(on)
   on('tool.call', { tool: 'TodoWrite' }, () => ({ result: { oldTodos: [], newTodos: todos } }))
@@ -137,7 +137,8 @@ test('TodoWrite mostra o progresso e o botão de checklist', async ($, on) => {
   await $.tool.call({ tool: 'TodoWrite', todos })
   const ui = await mountBand($)
   expect(await ui.find({ key: 'base' })).toBeTruthy()
-  expect(await ui.find({ key: 'toggle' })).toBeTruthy()
+  expect(await ui.find({ text: /Construindo/ }), 'the step in progress in the list').toBeTruthy()
+  expect(await ui.find({ text: /Pesquisar/ }), 'a finished step in the list').toBeTruthy()
   expect(await ui.find({ text: /33% \(1\/3\)/ })).toBeTruthy()
   await ui.unmount()
 })

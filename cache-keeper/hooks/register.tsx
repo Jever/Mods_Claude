@@ -439,8 +439,8 @@ export const register: Register = (on, options) => {
     }
 
     const timerCell = timer.padEnd(TIMER_W).slice(0, TIMER_W)
-    const keepLabel = (w ? 'Parar aquecimento' : 'Manter aquecido').padEnd(17)
-    const handoffLabel = (busy ? 'Gerando...' : 'Limpar Sessão').padEnd(13)
+    const keepLabel = w ? 'Parar aquecimento' : 'Manter aquecido'
+    const handoffLabel = busy ? 'Gerando...' : 'Limpar Sessão'
 
     // Abaixo do que já está acima do prompt, para não espremer um banner de várias linhas (o plano).
     return (

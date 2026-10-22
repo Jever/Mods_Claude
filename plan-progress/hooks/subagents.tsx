@@ -398,6 +398,12 @@ export async function startSubagents($: EngineInterface, isOff: () => boolean) {
   }
 }
 
+/**
+ * O que um desenho de baixo devolveu, pronto para ser aninhado. O engine devolve um placeholder
+ * próprio quando ninguém desenha; aninhá-lo recusa a árvore inteira e o painel fica vazio.
+ */
+export const nestable = (drawn: unknown) => (drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null)
+
 /** Chamada de ferramenta de um subagente: o passo entra no card dele. A lógica do plano não muda. */
 export function trackSubagentCall($: EngineInterface, isOff: () => boolean, call: { tool: string; agentId?: string }) {
   if (call.agentId && !isOff()) {
@@ -463,7 +469,7 @@ export function registerSubagents(on: On, isOff: () => boolean) {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     if (isOff()) return next(e)
     // O que vier de dentro (o plano, do plan-progress) fica acima dos cards.
-    const below = await next(e)
+    const below = nestable(await next(e))
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     // O Svg desenha no desktop, no editor e no celular; o terminal recebe um glifo.
@@ -656,7 +662,7 @@ export function registerSubagents(on: On, isOff: () => boolean) {
 
     return (
       <Box flexDirection="column" width={width}>
-        {below}
+        {below as never}
         <Box key="header" flexDirection="row" justifyContent="space-between" gap={1} width={width} marginBottom={1}>
           <Text bold color={running.length ? ACCENT : list.length ? GOOD : undefined}>
             {list.length ? `${list.length} subagente${list.length === 1 ? '' : 's'} neste chat` : 'Nenhum subagente ainda'}

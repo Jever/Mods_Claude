@@ -81,7 +81,6 @@ declare module 'claude-code' {
     'plan-progress': {
       plan: Plan | null
       now: number
-      isExpanded: boolean
       tasks: TrackedTask[]
       ledger: Ledger | null
       /** Subagentes do chat, na ordem de início. */

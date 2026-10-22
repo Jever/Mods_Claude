@@ -2,11 +2,10 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
-import { PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
+import { nestable, PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
 const now = atom({ plugin: 'plan-progress', key: 'now' } as const, 0)
-const isExpanded = atom({ plugin: 'plan-progress', key: 'isExpanded' } as const, false)
 const tasks = atom({ plugin: 'plan-progress', key: 'tasks' } as const, [])
 const ledger = atom({ plugin: 'plan-progress', key: 'ledger' } as const, null)
 
@@ -293,16 +292,29 @@ export const register: Register = on => {
           : null
     if (source === null) return next(e)
 
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const { Box, Text } = $.ui.resolve(e)
     const clock = await read($, now)
-    const expanded = await read($, isExpanded)
     const percent = percentOf(source.items)
     const done = source.items.filter(t => t.status === 'completed').length
-    const doing = source.items.find(t => t.status === 'in_progress')
     const isDone = done === source.items.length
     const phase = current?.phase
+    const below = nestable(await next(e))
 
-    const below = await next(e)
+    // Linhas no formato do To-do do chat-inventory: a marca numa coluna fixa e o texto ao lado.
+    const todoRow = (t: Todo, i: number) => {
+      const finished = t.status === 'completed'
+      const live = t.status === 'in_progress'
+      return (
+        <Box key={`todo-${i}`} flexDirection="row">
+          <Box width={2} flexShrink={0}>
+            {finished ? <Text color="#16a34a">✓</Text> : live ? <Text color="#d97757">●</Text> : <Text dimColor>○</Text>}
+          </Box>
+          <Text dimColor={finished} strikethrough={finished} bold={live}>
+            {live ? t.activeForm : t.content}
+          </Text>
+        </Box>
+      )
+    }
 
     return (
       <Box flexDirection="column">
@@ -316,26 +328,11 @@ export const register: Register = on => {
               </Text>
             ))}
         </Box>
-        <Box>
-          <Text color={isDone ? 'success' : undefined}>
-            {bar(percent)} {percent}% ({done}/{source.items.length})  {elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)}{' '}
-          </Text>
-          <Button
-            key="toggle"
-            label={expanded ? 'Recolher' : 'Checklist'}
-            hotkey="p"
-            onPress={() => update($, isExpanded, v => !v)}
-          />
-        </Box>
-        {!expanded && doing && <Text dimColor>▶ {doing.activeForm}</Text>}
-        {expanded &&
-          source.items.map((t, i) => (
-            <Text key={`todo-${i}`} dimColor={t.status === 'completed'} bold={t.status === 'in_progress'}>
-              {t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '▶' : '○'}{' '}
-              {t.status === 'in_progress' ? t.activeForm : t.content}
-            </Text>
-          ))}
-        {below}
+        <Text color={isDone ? 'success' : undefined}>
+          {bar(percent)} {percent}% ({done}/{source.items.length})  {elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)}
+        </Text>
+        {source.items.map(todoRow)}
+        {below as never}
       </Box>
     )
   })
