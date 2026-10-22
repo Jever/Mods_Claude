@@ -91,6 +91,10 @@ declare module 'claude-code' {
       helperView: { open: string[]; folded: string[] }
       /** Custo total do chat em dólares, null quando o host não guarda. */
       helperCost: { usd: number | null }
+      /** Tokens do chat principal somados por turno (cache incluso), para o card "Tokens totais". */
+      chatTokens: number
+      /** Quadro da animação da barra do plano, avança a cada 600 ms. */
+      planTick: number
     }
   }
 }

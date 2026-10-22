@@ -15,6 +15,8 @@ const HELPERS = { plugin: 'plan-progress', key: 'helpers' } as const
 const CLOCK = { plugin: 'plan-progress', key: 'helperClock' } as const
 const VIEW = { plugin: 'plan-progress', key: 'helperView' } as const
 const COST = { plugin: 'plan-progress', key: 'helperCost' } as const
+// Tokens do chat principal, somados turno a turno (os dos subagentes ficam em HELPERS).
+const CHAT_TOKENS = { plugin: 'plan-progress', key: 'chatTokens' } as const
 
 const TICK_MS = 300
 const POLL_MS = 2000
@@ -459,6 +461,10 @@ export function registerSubagents(on: On, isOff: () => boolean) {
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
     const id = e.agentId
+    if (!id && e.usage) {
+      const { value = 0 } = await $.state.get(CHAT_TOKENS)
+      await $.state.set(CHAT_TOKENS, value + usageTotal(e.usage as unknown as Usage))
+    }
     if (id && !isOff() && helpers.some(hp => hp.id === id)) {
       const failed = e.reason === 'error' || e.reason === 'refusal' || e.isAborted
       void finish($, isOff, id, failed ? 'failed' : 'done', e.usage ?? null).catch(() => undefined)
@@ -478,6 +484,7 @@ export function registerSubagents(on: On, isOff: () => boolean) {
     const { value: clk = { tick: 0, now: 0 } } = await $.state.get(CLOCK)
     const { value: view = { open: [], folded: [] } } = await $.state.get(VIEW)
     const { value: cost = { usd: null } } = await $.state.get(COST)
+    const { value: chatTokens = 0 } = await $.state.get(CHAT_TOKENS)
     const width = Math.max(32, e.props.bodyColumns)
     // Dentro do card: a borda e o espaçamento tomam 4 colunas, mais o bichinho (PET_W).
     const cw = width - 4 - PET_W
@@ -489,7 +496,9 @@ export function registerSubagents(on: On, isOff: () => boolean) {
     // Totais do topo: só números que o engine informou.
     const tiles: { label: string; value: string }[] = []
     if (cost.usd !== null) tiles.push({ label: 'Custo do chat', value: `$${cost.usd.toFixed(2)}` })
-    if (list.some(hp => hp.hasUsage)) tiles.push({ label: 'Tokens dos subagentes', value: tokenText(list.reduce((n, hp) => n + hp.tokens + hp.turnTokens, 0)) })
+    const subTokens = list.reduce((n, hp) => n + hp.tokens + hp.turnTokens, 0)
+    if (chatTokens > 0 || list.some(hp => hp.hasUsage)) tiles.push({ label: 'Tokens totais', value: tokenText(chatTokens + subTokens) })
+    if (list.some(hp => hp.hasUsage)) tiles.push({ label: 'Tokens dos subagentes', value: tokenText(subTokens) })
     if (list.length) {
       const start = Math.min(...list.map(hp => hp.startedAt))
       const end = running.length ? Math.max(clk.now, ...running.map(hp => hp.startedAt)) : Math.max(...list.map(hp => hp.endedAt))

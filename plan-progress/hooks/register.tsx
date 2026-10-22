@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
+import { planBarSvg } from './cards'
 import { nestable, PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
@@ -86,9 +87,10 @@ const elapsed = (ms: number): string => {
     : `${minutes}m${String(total % 60).padStart(2, '0')}s`
 }
 
-const bar = (percent: number, width = 20): string => {
-  const filled = Math.round((percent / 100) * width)
-  return '█'.repeat(filled) + '░'.repeat(width - filled)
+/** Uma cor entre `a` e `b` (#rrggbb); `t` de 0 a 1. */
+const mix = (a: string, b: string, t: number): string => {
+  const at = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16)
+  return `#${[0, 1, 2].map(i => Math.round(at(a, i) + (at(b, i) - at(a, i)) * t).toString(16).padStart(2, '0')).join('')}`
 }
 
 const clip = (text: string, max: number): string => {
@@ -179,6 +181,44 @@ const fromLedger = (l: Ledger): Todo[] => {
 const fromTasks = (list: readonly TrackedTask[]): Todo[] =>
   list.map(t => ({ content: t.subject, activeForm: t.activeForm, status: t.status }))
 
+// Quadro da animação da barra do plano: avança a cada 600 ms enquanto o mod está ligado.
+const PLAN_TICK = { plugin: 'plan-progress', key: 'planTick' } as const
+const PLAN_TICK_MS = 600
+const P_LIGHT = '#c4b5fd'
+const P_MID = '#8b5cf6'
+const P_DEEP = '#6d28d9'
+let sid = ''
+let home = ''
+let planN = 0
+
+const isTodoStatus = (v: unknown): v is TodoStatus => v === 'pending' || v === 'in_progress' || v === 'completed'
+
+/**
+ * O plano que outro mod grava em `~/.claude/mods-state/plan-<sessão>.json` (título e passos com status).
+ * Lido a cada desenho; nunca lança: sem arquivo, ou com um arquivo quebrado, a fonte simplesmente não conta.
+ */
+async function readPlanFile($: EngineInterface): Promise<{ goal: string; items: Todo[]; startedAt: number } | null> {
+  if (!sid || !home) return null
+  try {
+    const path = `${home}/.claude/mods-state/plan-${sid}.json`
+    if (!(await $.fs.exists(path))) return null
+    const json = JSON.parse(String(await $.fs.read(path))) as { title?: unknown; steps?: unknown; updatedAt?: unknown }
+    const items: Todo[] = []
+    for (const st of Array.isArray(json.steps) ? (json.steps as Record<string, unknown>[]) : []) {
+      if (typeof st.text === 'string' && isTodoStatus(st.status)) items.push({ content: st.text, status: st.status, activeForm: st.text })
+    }
+    if (!items.length) return null
+    const at = typeof json.updatedAt === 'string' ? Date.parse(json.updatedAt) : NaN
+    return {
+      goal: typeof json.title === 'string' && json.title ? json.title : 'Plano',
+      items,
+      startedAt: Number.isFinite(at) ? at : 0,
+    }
+  } catch {
+    return null
+  }
+}
+
 // O painel abre sozinho quando um plano ganha itens. Um plano só abre uma vez: se você fechar, ele fica fechado até você abrir.
 let announced: number | string | null = null
 async function openPlanPane($: EngineInterface) {
@@ -199,7 +239,13 @@ export const register: Register = on => {
   registerSubagents(on, () => off)
 
   on('session.start', async ($, e, next) => {
+    home = $.plugin.root.split('/.claude/')[0] ?? ''
+    sid = await $.session.id().catch(() => '')
     await update($, now, () => 0)
+    $.clock.every(PLAN_TICK_MS, () => {
+      planN += 1
+      void $.state.set(PLAN_TICK, planN).catch(() => undefined)
+    })
     await refreshLedger($, { force: true, publish: true }).catch(() => undefined)
     await readSwitch($).catch(() => undefined)
     await startSubagents($, () => off)
@@ -282,50 +328,90 @@ export const register: Register = on => {
     const current = await read($, plan)
     const tracked = await read($, tasks)
 
+    // Fontes, da mais específica para a mais geral: ledger do superpowers, arquivo do plano, TodoWrite, TaskCreate.
+    const file = await readPlanFile($)
     const source = isLedgerShown(sdd, stamp)
       ? { goal: sdd.title, items: fromLedger(sdd), startedAt: sdd.seenAt }
-      : current !== null && current.todos.length > 0
-        ? { goal: current.goal, items: current.todos, startedAt: current.startedAt }
-        : tracked.length > 0
-          ? { goal: current?.goal ?? 'Sessão atual', items: fromTasks(tracked), startedAt: current?.startedAt ?? stamp }
-          : null
+      : file !== null
+        ? file
+        : current !== null && current.todos.length > 0
+          ? { goal: current.goal, items: current.todos, startedAt: current.startedAt }
+          : tracked.length > 0
+            ? { goal: current?.goal ?? 'Sessão atual', items: fromTasks(tracked), startedAt: current?.startedAt ?? stamp }
+            : null
     if (source === null) return next(e)
 
-    const { Box, Text } = $.ui.resolve(e)
+    const els = $.ui.resolve(e)
+    const { Box, Text } = els
+    // O Svg desenha no desktop, no editor e no celular; o terminal usa blocos.
+    const Svg = e.surface !== 'terminal' && 'Svg' in els ? els.Svg : null
+    const width = Math.max(32, e.props.bodyColumns)
     const clock = await read($, now)
+    const { value: tick = 0 } = await $.state.get(PLAN_TICK)
     const percent = percentOf(source.items)
     const done = source.items.filter(t => t.status === 'completed').length
     const isDone = done === source.items.length
+    const live = source.items.some(t => t.status === 'in_progress')
     const phase = current?.phase
     const below = nestable(await next(e))
+    const time = elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)
+
+    // Barra do terminal: degradê de roxo claro a escuro no trecho feito; um bloco que pisca no passo em andamento.
+    const barCols = Math.max(10, width - 4 - 24)
+    const fillCols = Math.round((barCols * percent) / 100)
+    const cells = Array.from({ length: fillCols }, (_, i) => (
+      <Text key={`f${i}`} color={mix(P_LIGHT, P_DEEP, fillCols > 1 ? i / (fillCols - 1) : 1)}>
+        █
+      </Text>
+    ))
+    const head = live && fillCols < barCols ? <Text color={tick % 2 ? P_MID : P_LIGHT}>▓</Text> : null
+    const track = '░'.repeat(Math.max(0, barCols - fillCols - (head ? 1 : 0)))
 
     // Linhas no formato do To-do do chat-inventory: a marca numa coluna fixa e o texto ao lado.
     const todoRow = (t: Todo, i: number) => {
       const finished = t.status === 'completed'
-      const live = t.status === 'in_progress'
+      const active = t.status === 'in_progress'
       return (
         <Box key={`todo-${i}`} flexDirection="row">
           <Box width={2} flexShrink={0}>
-            {finished ? <Text color="#16a34a">✓</Text> : live ? <Text color="#d97757">●</Text> : <Text dimColor>○</Text>}
+            {finished ? <Text color="#16a34a">✓</Text> : active ? <Text color="#d97757">●</Text> : <Text dimColor>○</Text>}
           </Box>
-          <Text dimColor={finished} strikethrough={finished} bold={live}>
-            {live ? t.activeForm : t.content}
+          <Text dimColor={finished} strikethrough={finished} bold={active}>
+            {active ? t.activeForm : t.content}
           </Text>
         </Box>
       )
     }
 
     return (
-      <Box flexDirection="column">
-        <Text wrap="truncate-end">
-          <Text bold>Plano: </Text>
-          <Text>{clip(source.goal, 70)}</Text>
-        </Text>
-        {phase !== undefined && <Text dimColor>Fase: {phase}</Text>}
-        <Text color={isDone ? 'success' : undefined}>
-          {bar(percent)} {percent}% ({done}/{source.items.length})  {elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)}
-        </Text>
-        {source.items.map(todoRow)}
+      <Box flexDirection="column" width={width}>
+        <Box flexDirection="column" borderStyle="round" paddingX={1} width={width}>
+          <Text wrap="truncate-end">
+            <Text bold>Plano: </Text>
+            <Text>{clip(source.goal, 70)}</Text>
+          </Text>
+          {phase !== undefined && <Text dimColor>Fase: {phase}</Text>}
+          <Box flexDirection="row" gap={1}>
+            {Svg ? (
+              <Svg
+                source={planBarSvg(percent, Math.max(120, Math.floor((width - 26) * 6.5)))}
+                alt={`Plano: ${percent}%`}
+                width={Math.max(120, Math.floor((width - 26) * 6.5))}
+                height={14}
+              />
+            ) : (
+              <Text>
+                {cells}
+                {head}
+                <Text dimColor>{track}</Text>
+              </Text>
+            )}
+            <Text color={isDone ? 'success' : undefined} bold>
+              {percent}% ({done}/{source.items.length}) {time}
+            </Text>
+          </Box>
+          {source.items.map(todoRow)}
+        </Box>
         {below as never}
       </Box>
     )

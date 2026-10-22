@@ -92,6 +92,22 @@ for (const surface of ['desktop', 'terminal'] as const) {
   })
 }
 
+test('o plano do arquivo compartilhado aparece no painel', async ($, on) => {
+  mock.clock(on)
+  noLedger(on)
+  on('session.id', async () => ({ value: 'sess1' }) as never)
+  on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path.endsWith('/.claude/mods-state/plan-sess1.json') }) as never)
+  on('fs.read', async () => ({ value: JSON.stringify({ title: 'Plano X', steps: [{ text: 'Passo um', status: 'in_progress' }, { text: 'Passo dois', status: 'pending' }], updatedAt: '2026-10-22T10:00:00Z' }) }) as never)
+  baseBand(on)
+  await $.session.start({ source: 'startup', cwd: '/proj', surface: 'terminal', isInteractive: true } as never)
+  const ui = await mountBand($)
+  expect(await ui.find({ text: /Plano X/ }), 'title from the shared file').toBeTruthy()
+  expect(await ui.find({ text: /Passo um/ }), 'step from the shared file').toBeTruthy()
+  await ui.unmount()
+})
+
 test('desligado no /mods, a faixa não desenha nada próprio', async ($, on) => {
   mock.clock(on)
   noLedger(on)

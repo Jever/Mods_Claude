@@ -37,6 +37,35 @@ function sparkles(w: number, h: number, size: number, base: number, rise: number
 }
 
 /**
+ * A barra de progresso do plano no desktop: degradê roxo que enche com o avanço, faíscas e um brilho
+ * que percorre o trecho preenchido. Só a posição do brilho se move; o resto é fixo entre os redesenhos.
+ */
+export function planBarSvg(percent: number, W: number): string {
+  const H = 14
+  const fillW = Math.round((W * Math.max(0, Math.min(100, percent))) / 100)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<style>
+${twinkleCss(false)}
+.sw{animation:sw 2.4s linear infinite}
+@keyframes sw{from{transform:translateX(-80px)}to{transform:translateX(${fillW + 80}px)}}
+@media (prefers-reduced-motion: reduce){.s0,.s1,.s2,.s3,.sw{animation:none}}
+</style>
+<defs>
+<linearGradient id="pb-g" x1="0" x2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset=".55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient>
+<linearGradient id="pb-s" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<clipPath id="pb-c"><rect width="${W}" height="${H}" rx="${H / 2}"/></clipPath>
+<clipPath id="pb-f"><rect width="${fillW}" height="${H}"/></clipPath>
+</defs>
+<g clip-path="url(#pb-c)">
+<rect width="${W}" height="${H}" fill="#8b5cf6" opacity=".16"/>
+${fillW > 0 ? `<rect width="${fillW}" height="${H}" fill="url(#pb-g)"/>` : ''}
+<g fill="#ffffff">${sparkles(fillW, H, 1.6, 0.12, 0.4)}</g>
+${fillW > 0 ? `<g clip-path="url(#pb-f)"><rect class="sw" width="80" height="${H}" fill="url(#pb-s)"/></g>` : ''}
+</g>
+</svg>`
+}
+
+/**
  * Uma barra grossa de faíscas por card. Enquanto trabalha, um trecho claro percorre a
  * barra (o tamanho do trabalho é desconhecido); ao terminar, a barra enche e brilha devagar.
  * O desenho depende só da fase, então o CSS move a barra e os redesenhos não a reiniciam.
