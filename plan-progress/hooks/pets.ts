@@ -1,7 +1,7 @@
 // Bichinhos: um caranguejo pixel do Claude, uma cor de corpo por subagente.
 // O desktop desenha o SVG; o terminal usa texto (ver subagents.ts).
 
-export type Px = [x: number, y: number]
+type Px = [x: number, y: number]
 
 // Oito cores de corpo fáceis de distinguir e legíveis no claro e no escuro.
 export const HUES: { name: string; color: string }[] = [

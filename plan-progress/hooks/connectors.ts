@@ -76,10 +76,7 @@ const BY_TOOL: [RegExp, string][] = [
 ]
 
 /** The label for a connector whose name cannot be told from its server or its tools. */
-export const OTHER = 'Connector'
-
-/** Every name this file can give, so a caller can set up one handler per name. */
-export const CONNECTOR_NAMES: readonly string[] = [...new Set([...Object.values(NAMED), ...BY_TOOL.map(r => r[1]), OTHER])]
+const OTHER = 'Connector'
 
 const titleCase = (s: string) =>
   s
@@ -89,7 +86,7 @@ const titleCase = (s: string) =>
     .join(' ')
 
 /** A random id rather than a name: 8 hex characters, a dash, then more hex and dashes. */
-export const isIdServer = (server: string) => /^[0-9a-f]{8}-[0-9a-f-]*$/i.test(server)
+const isIdServer = (server: string) => /^[0-9a-f]{8}-[0-9a-f-]*$/i.test(server)
 
 // Servers already named by one of their tools, so a tool that fits no pattern still gets the name.
 const known = new Map<string, string>()
