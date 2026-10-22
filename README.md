@@ -1,6 +1,6 @@
 # Mods para Claude Code
 
-Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat: a faixa acima do prompt, o painel lateral, ou um comando novo. Todos vêm do marketplace `meus-mods` e podem ser ligados e desligados pelo `/mods`.
+Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat: a faixa acima do prompt, o painel lateral, ou um comando novo. Todos vêm do marketplace `jeverjm` e podem ser ligados e desligados pelo `/mods`.
 
 | Mod | Versão | O que faz | Como abrir |
 | --- | --- | --- | --- |
@@ -26,7 +26,7 @@ Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat
 <a id="instalacao"></a>
 ## Instalação
 
-Os mods estão neste repositório, que é também o marketplace `meus-mods`.
+Os mods estão neste repositório, que é também o marketplace `jeverjm`.
 
 ### Todos de uma vez
 
@@ -34,12 +34,12 @@ No prompt do Claude Code:
 
 ```
 /plugin marketplace add Jever/Mods_Claude
-/plugin install cache-keeper@meus-mods
-/plugin install prompt-enhancer@meus-mods
-/plugin install plan-progress@meus-mods
-/plugin install chat-inventory@meus-mods
-/plugin install screen-share@meus-mods
-/plugin install mods@meus-mods
+/plugin install cache-keeper@jeverjm
+/plugin install prompt-enhancer@jeverjm
+/plugin install plan-progress@jeverjm
+/plugin install chat-inventory@jeverjm
+/plugin install screen-share@jeverjm
+/plugin install mods@jeverjm
 ```
 
 Ou pelo terminal, de uma vez:
@@ -47,7 +47,7 @@ Ou pelo terminal, de uma vez:
 ```bash
 claude plugin marketplace add Jever/Mods_Claude
 for p in cache-keeper prompt-enhancer plan-progress chat-inventory screen-share mods; do
-  claude plugin install "$p@meus-mods"
+  claude plugin install "$p@jeverjm"
 done
 ```
 
@@ -58,7 +58,7 @@ Depois, reinicie o Claude Code ou rode `/reload-plugins`.
 Instale só o que quiser. Cada mod funciona sozinho:
 
 ```
-/plugin install cache-keeper@meus-mods
+/plugin install cache-keeper@jeverjm
 ```
 
 O `mods` é opcional, mas é o único jeito de ligar e desligar os outros pela tela. Sem ele, use `/screen-share` e os comandos de cada mod.
@@ -66,7 +66,7 @@ O `mods` é opcional, mas é o único jeito de ligar e desligar os outros pela t
 ### Remover
 
 ```
-/plugin uninstall cache-keeper@meus-mods
+/plugin uninstall cache-keeper@jeverjm
 ```
 
 ## Como cada mod funciona

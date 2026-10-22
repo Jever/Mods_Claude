@@ -1,5 +1,5 @@
 {
-  "name": "meus-mods",
+  "name": "jeverjm",
   "owner": { "name": "jever" },
   "plugins": [
     { "name": "cache-keeper", "source": "./cache-keeper", "description": "Botão Limpar Sessão (handoff com briefing) e aviso de qualidade quando o contexto enche." },
