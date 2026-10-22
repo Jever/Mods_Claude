@@ -22,14 +22,14 @@ type Mod = { name: string; title: string; what: string; pane: boolean; hide: boo
 // A row in the pane: a known mod or one found on disk. switchable: its source reads switches.json.
 type Row = Mod & { switchable: boolean; chatOnly: boolean }
 
+// Só os mods instalados hoje. Cada um lê o switches.json, então pode ser ligado e desligado aqui.
+// pane: abre um painel (com Open). hide: tem Mostrar/Ocultar. ask: Mostrar também deixa um pedido de abertura.
 const MODS: readonly Mod[] = [
-  { name: 'cache-clock', title: 'Cache Clock', what: 'Counts down until the cache goes cold', pane: false, hide: true, ask: false, tip: '/cacheclock to show or hide' },
-  { name: 'handoff', title: 'Handoff (Refresh)', what: 'Moves a long chat to a fresh one', pane: false, hide: true, ask: true, tip: '/refresh to show it' },
-  { name: 'screen-share', title: 'Screen-Share Mode', what: 'Hides emails, phones and amounts on screen', pane: false, hide: false, ask: false, tip: '/screen-share to hide private data' },
-  { name: 'brain-dump', title: 'Brain-Dump Shaper', what: 'Turns long rambling prompts into clear briefs', pane: false, hide: false, ask: false, tip: '' },
-  { name: 'reflect', title: 'Reflect', what: 'Saves your corrections as lasting rules', pane: false, hide: false, ask: false, tip: '' },
-  { name: 'helper-desk', title: 'Helper Desk', what: 'Task progress bar above the prompt, plus a card per subagent', pane: true, hide: true, ask: true, tip: '/helpers to open' },
+  { name: 'cache-keeper', title: 'Cache Keeper', what: 'Countdown to the cold cache, keep warm and Limpar Sessão', pane: false, hide: false, ask: false, tip: '/keepwarm' },
+  { name: 'prompt-enhancer', title: 'Prompt Enhancer', what: 'Rewrites the prompt draft without sending it', pane: false, hide: false, ask: false, tip: '/aprimorar' },
+  { name: 'plan-progress', title: 'Plano e subagentes', what: 'The chat plan and one card per subagent', pane: false, hide: false, ask: false, tip: '/subagentes' },
   { name: 'chat-inventory', title: 'Chat Inventory', what: 'Connectors, files and skills this chat used', pane: true, hide: true, ask: true, tip: '/inventory to open' },
+  { name: 'screen-share', title: 'Screen-Share Mode', what: 'Hides emails, phones and amounts on screen', pane: false, hide: false, ask: false, tip: '/screen-share to hide private data' },
 ]
 
 // Module variables reset on a reload; the switches themselves live in the file.
