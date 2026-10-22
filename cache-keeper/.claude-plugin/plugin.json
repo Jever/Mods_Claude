@@ -1,7 +1,7 @@
 {
   "name": "cache-keeper",
-  "version": "0.1.0",
-  "description": "Botão Limpar Sessão acima do prompt (handoff com briefing) e aviso de qualidade quando o contexto enche.",
+  "version": "0.2.0",
+  "description": "Acima do prompt: contagem até o cache esfriar, Manter aquecido (ping antes de esfriar) e botão Limpar Sessão (handoff com briefing). Avisa de qualidade quando o contexto enche.",
   "types": "./types/index.d.ts",
   "userConfig": {
     "warnPercent": {
