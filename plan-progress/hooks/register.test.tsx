@@ -34,6 +34,23 @@ test('sem TodoWrite a faixa não aparece', async ($, on) => {
   await ui.unmount()
 })
 
+test('desligado no /mods, a faixa não desenha nada próprio', async ($, on) => {
+  mock.clock(on)
+  noLedger(on)
+  const switches = '{"plan-progress": false}'
+  on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+  on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path.endsWith('/.claude/mods/switches.json') }) as never)
+  on('fs.read', async () => ({ value: switches }) as never)
+  on('tool.call', { tool: 'TodoWrite' }, () => ({ result: { oldTodos: [], newTodos: todos } }))
+  baseBand(on)
+  await $.session.start({ source: 'startup', cwd: '/proj', surface: 'terminal', isInteractive: true } as never)
+  await $.tool.call({ tool: 'TodoWrite', todos })
+  const ui = await mountBand($)
+  expect(await ui.find({ key: 'toggle' })).toBeFalsy()
+  expect(await ui.find({ text: /base/ })).toBeTruthy()
+  await ui.unmount()
+})
+
 test('TodoWrite mostra o progresso e o botão de checklist', async ($, on) => {
   mock.clock(on)
   noLedger(on)

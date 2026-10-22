@@ -9,6 +9,32 @@ const isExpanded = atom({ plugin: 'plan-progress', key: 'isExpanded' } as const,
 const tasks = atom({ plugin: 'plan-progress', key: 'tasks' } as const, [])
 const ledger = atom({ plugin: 'plan-progress', key: 'ledger' } as const, null)
 
+// O switchboard /mods desliga o mod em todos os chats pelo switches.json.
+const NAME = 'plan-progress'
+let off = false
+
+const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
+
+async function readSwitch($: EngineInterface) {
+  let nowOff = off
+  try {
+    const path = switchesPath($)
+    if (await $.fs.exists(path)) {
+      const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
+      nowOff = json[NAME] === false
+    }
+  } catch {
+    // Um arquivo quebrado não muda nada.
+  }
+  if (nowOff === off) return
+  off = nowOff
+  try {
+    $.ui.invalidate('ui.render')
+  } catch {
+    // O próximo redesenho acontece de qualquer forma.
+  }
+}
+
 const PHASES: Phase[] = ['pesquisa', 'planejamento', 'construção', 'teste', 'auditoria']
 const TEST_COMMAND = /\b(pytest|jest|vitest|mocha|tsc|mypy|ruff|eslint|go test|cargo test|npm (run )?test|pnpm test|yarn test|playwright test|plugin (test|validate))\b/
 const AUDIT_NAME = /review|audit|security|auditor|reviewer/i
@@ -161,6 +187,10 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await update($, now, () => 0)
     await refreshLedger($, { force: true, publish: true }).catch(() => undefined)
+    await readSwitch($).catch(() => undefined)
+    $.clock.every(3000, () => {
+      void readSwitch($).catch(() => undefined)
+    })
     $.clock.every(5000, async () => {
       const current = await refreshLedger($, { publish: true }).catch(() => null)
       const shown = isLedgerShown(current, await $.clock.now())
@@ -225,7 +255,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) return next(e)
+    if (off || e.props.hasSurvey) return next(e)
     // O atom só serve para redesenhar quem lê; o valor vem da leitura (com cache).
     await read($, ledger)
     const sdd = await refreshLedger($).catch(() => null)
