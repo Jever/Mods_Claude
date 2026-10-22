@@ -343,7 +343,6 @@ export const register: Register = on => {
     // O atom só serve para redesenhar quem lê; o valor vem da leitura (com cache).
     await read($, ledger)
     const stamp = await $.clock.now()
-    const current = await read($, plan)
     const source = await currentSource($)
     if (source === null) return next(e)
 
@@ -358,7 +357,6 @@ export const register: Register = on => {
     const done = source.items.filter(t => t.status === 'completed').length
     const isDone = done === source.items.length
     const live = source.items.some(t => t.status === 'in_progress')
-    const phase = current?.phase
     const below = nestable(await next(e))
     const time = elapsed(Math.max(clock, stamp, source.startedAt) - source.startedAt)
 
@@ -396,7 +394,6 @@ export const register: Register = on => {
             <Text bold>Plano: </Text>
             <Text>{clip(source.goal, 70)}</Text>
           </Text>
-          {phase !== undefined && <Text dimColor>Fase: {phase}</Text>}
           <Box flexDirection="row" gap={1}>
             {Svg ? (
               <Svg
