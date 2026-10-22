@@ -24,7 +24,6 @@ const MAX_MS = 2 * 60 * 60_000
 const MAX_FAILS = 3
 const RETRY_MS = 20_000
 const PING_PROMPT = 'Reply with the single word: ok'
-const TIP = 'Cada ping lê o chat do cache por uma pequena parte do preço (5 a 10%). Deixar esfriar significa escrever tudo de novo.'
 // Turnos que não são a pessoa digitando: não contam como "ela voltou".
 const BACKGROUND = new Set(['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'projects-relay', 'channel', 'coordinator', 'observer', 'observer-activity', 'auto-continuation'])
 
@@ -128,10 +127,6 @@ const short = (tokens: number) => `${Math.round(tokens / 1000)}k`
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-const ago = (ms: number) => {
-  const m = Math.floor(ms / 60_000)
-  return m < 1 ? 'agora há pouco' : m === 1 ? '1 min atrás' : m < 60 ? `${m} min atrás` : `${Math.floor(m / 60)} h atrás`
 }
 
 // De onde vem o tamanho do cache: a resposta da Anthropic ou uma estimativa antes da primeira.
@@ -436,71 +431,80 @@ export const register: Register = (on, options) => {
     const below = await next(e)
     const c = await getClock($)
     const w = await getWarm($)
-    const handoffButton = (
-      <Button key="handoff" label={busy ? 'Gerando...' : 'Limpar Sessão'} hotkey="h" onPress={() => handoff($, true)} />
-    )
 
-    // Sem resposta ainda, ou enquanto um turno roda: só o botão, como antes.
-    if (working || e.props.isWorking || !c || !c.lastEnd) {
-      return (
-        <Box>
-          {below}
-          {handoffButton}
-          <Text> </Text>
-        </Box>
-      )
+    // Sempre duas linhas, com larguras fixas: a contagem, a barra e os textos mudam sem
+    // empurrar os botões, e a faixa não pula de lugar enquanto o tempo passa.
+    const cols = Math.max(80, e.props.bodyColumns || 0)
+    const TIMER_W = 24
+    const KEEP_W = 22
+    const HANDOFF_W = 18
+    const BAR_W = Math.min(BAR, cols - TIMER_W - KEEP_W - HANDOFF_W - 3)
+
+    const turning = working || e.props.isWorking
+    const left = c && c.lastEnd ? c.lastEnd + c.ttlMs - c.now : 0
+    const cost = c ? `${short(c.tokens)} tokens` : ''
+    let timer = '◷ Cache ainda não'
+    let timerColor: string | undefined
+    let filled = 0
+    let note = 'O cache começa depois da primeira resposta do Claude.'
+    if (turning) {
+      timer = '◷ Respondendo...'
+      note = 'A resposta em andamento usa o cache.'
+    } else if (c && c.lastEnd && left > 0) {
+      const share = left / c.ttlMs
+      filled = Math.max(1, Math.round(share * BAR_W))
+      timerColor = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
+      timer = `◷ Cache aquecido ${mmss(left)}`
+      note = `${lengthLabel(c)}. Responder agora relê ${cost} por 5 a 10% do custo.`
+    } else if (c && c.lastEnd) {
+      timerColor = COLD
+      const minutes = Math.floor(-left / 60_000)
+      timer = minutes < 1 ? '❄ Frio há menos de 1 min' : `❄ Frio há ${minutes} min`
+      note = `Sua próxima mensagem relê ${cost} pelo preço cheio.`
+    }
+    let noteColor: string | undefined
+    if (w && !turning) {
+      noteColor = w.cold || w.error ? BAD : COLD
+      note = warmLine(w, left)
     }
 
-    const left = c.lastEnd + c.ttlMs - c.now
-    const cost = `${short(c.tokens)} tokens`
-    const buttons = (
-      <Box flexDirection="row" gap={1}>
-        <Button key="keepwarm" label={w ? 'Parar de manter aquecido' : 'Manter aquecido'} onPress={() => toggleWarm($)} />
-        {handoffButton}
+    const row = (
+      <Box flexDirection="row" width={cols} gap={1}>
+        <Box width={TIMER_W}>
+          <Text color={timerColor} wrap="truncate-end">
+            {timer}
+          </Text>
+        </Box>
+        <Box width={BAR_W}>
+          <Text>
+            <Text color={timerColor}>{'━'.repeat(filled)}</Text>
+            <Text dimColor>{'┄'.repeat(BAR_W - filled)}</Text>
+          </Text>
+        </Box>
+        <Box width={KEEP_W}>
+          <Button key="keepwarm" label={w ? 'Parar aquecimento' : 'Manter aquecido'} onPress={() => toggleWarm($)} />
+        </Box>
+        <Box width={HANDOFF_W}>
+          <Button key="handoff" label={busy ? 'Gerando...' : 'Limpar Sessão'} hotkey="h" onPress={() => handoff($, true)} />
+        </Box>
       </Box>
     )
-    const warmRow = w ? <Text color={w.cold || w.error ? BAD : COLD}>{warmLine(w, left)}</Text> : null
-    const tip = <Text dimColor>{TIP}</Text>
-
-    if (left > 0) {
-      const share = left / c.ttlMs
-      const filled = Math.max(1, Math.round(share * BAR))
-      const color = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
-      return (
-        <Box flexDirection="column">
-          {below}
-          <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Text>
-              <Text color={color}>◷ Cache aquecido </Text>
-              <Text bold color={color}>
-                {mmss(left)}
-              </Text>
-              <Text> </Text>
-              <Text color={color}>{'━'.repeat(filled)}</Text>
-              <Text dimColor>{'━'.repeat(BAR - filled)}</Text>
-              <Text dimColor>{` ${lengthLabel(c)}.`}</Text>
-              <Text dimColor> Responder agora relê {cost} por 5 a 10% do custo.</Text>
-            </Text>
-            {buttons}
-          </Box>
-          {warmRow}
-          {tip}
-        </Box>
-      )
-    }
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" width={cols}>
         {below}
-        <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
-          <Text>
-            <Text color={COLD}>❄ Cache frio</Text>
-            <Text dimColor> desde {ago(-left)}. Sua próxima mensagem relê {cost} pelo preço cheio.</Text>
-          </Text>
-          {buttons}
+        {row}
+        <Box width={cols}>
+          {noteColor ? (
+            <Text color={noteColor} wrap="truncate-end">
+              {note}
+            </Text>
+          ) : (
+            <Text dimColor wrap="truncate-end">
+              {note}
+            </Text>
+          )}
         </Box>
-        {warmRow}
-        {tip}
       </Box>
     )
   })
