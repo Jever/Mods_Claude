@@ -9,8 +9,8 @@ import { FRAMES, hueOf, HUES, petSvg } from './pets'
 // novo grupo de subagentes começa; /subagentes abre quando você quiser.
 
 const NAME = 'plan-progress'
-const PANE = 'subagents'
-const TITLE = 'Subagentes'
+export const PANE = 'subagents'
+export const TITLE = 'Subagentes'
 const HELPERS = { plugin: 'plan-progress', key: 'helpers' } as const
 const CLOCK = { plugin: 'plan-progress', key: 'helperClock' } as const
 const VIEW = { plugin: 'plan-progress', key: 'helperView' } as const
@@ -462,6 +462,8 @@ export function registerSubagents(on: On, isOff: () => boolean) {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     if (isOff()) return next(e)
+    // O que vier de dentro (o plano, do plan-progress) fica acima dos cards.
+    const below = await next(e)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     // O Svg desenha no desktop, no editor e no celular; o terminal recebe um glifo.
@@ -654,6 +656,7 @@ export function registerSubagents(on: On, isOff: () => boolean) {
 
     return (
       <Box flexDirection="column" width={width}>
+        {below}
         <Box key="header" flexDirection="row" justifyContent="space-between" gap={1} width={width} marginBottom={1}>
           <Text bold color={running.length ? ACCENT : list.length ? GOOD : undefined}>
             {list.length ? `${list.length} subagente${list.length === 1 ? '' : 's'} neste chat` : 'Nenhum subagente ainda'}

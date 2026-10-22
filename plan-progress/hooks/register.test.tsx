@@ -9,7 +9,9 @@ const todos = [
 
 // Só hasSurvey importa para o mod; as demais props da faixa ficam com o padrão do kit.
 const BAND_PROPS = { hasSurvey: false } as RenderPropsOf['AbovePrompt']
-const mountBand = ($: Engine) => $.ui.mount({ plugin: 'plan-progress', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+// O plano agora fica no painel de subagentes (requestId 'subagents').
+const PANE_PROPS = { title: 'Subagentes', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: {}, view: {} } as never
+const mountBand = ($: Engine) => $.ui.mount({ plugin: 'plan-progress', surface: 'terminal', component: 'Pane', requestId: 'subagents', props: PANE_PROPS })
 
 const baseBand = (on: On) =>
   on('ui.render', ($, e) => {
@@ -60,6 +62,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('agent.list', async () => ({ value: agents.map(a => ({ ...a })) }) as never)
     on('tool.call', async () => ({ result: 'ok' }) as never)
     on('turn.complete', async () => ({ text: '' }) as never)
+    baseBand(on)
     await $.session.start({ source: 'startup', cwd: '/proj', surface, isInteractive: true } as never)
 
     await $.agent.spawn({ tool_use_id: 's1', prompt: 'x', description: 'Ler as notas', subagentType: 'Explore', model: 'haiku' } as never)
@@ -104,6 +107,23 @@ test('desligado no /mods, a faixa não desenha nada próprio', async ($, on) => 
   expect(await ui.find({ key: 'toggle' })).toBeFalsy()
   expect(await ui.find({ text: /base/ })).toBeTruthy()
   await ui.unmount()
+})
+
+test('o painel abre uma vez por plano, quando ganha itens', async ($, on) => {
+  mock.clock(on)
+  noLedger(on)
+  const opened: string[] = []
+  on('ui.open', async ($, e) => {
+    opened.push((e as { id: string }).id)
+    return { value: { isPlaced: true } } as never
+  })
+  on('tool.call', { tool: 'TodoWrite' }, () => ({ result: { oldTodos: [], newTodos: todos } }))
+  baseBand(on)
+  await $.tool.call({ tool: 'TodoWrite', todos: [] })
+  expect(opened, 'an empty list opens nothing').toHaveLength(0)
+  await $.tool.call({ tool: 'TodoWrite', todos })
+  await $.tool.call({ tool: 'TodoWrite', todos })
+  expect(opened, 'opens once for the plan').toEqual(['subagents'])
 })
 
 test('TodoWrite mostra o progresso e o botão de checklist', async ($, on) => {

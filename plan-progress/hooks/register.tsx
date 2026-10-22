@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
-import { registerSubagents, startSubagents, trackSubagentCall } from './subagents'
+import { PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
 const now = atom({ plugin: 'plan-progress', key: 'now' } as const, 0)
@@ -181,6 +181,20 @@ const fromLedger = (l: Ledger): Todo[] => {
 const fromTasks = (list: readonly TrackedTask[]): Todo[] =>
   list.map(t => ({ content: t.subject, activeForm: t.activeForm, status: t.status }))
 
+// O painel abre sozinho quando um plano ganha itens. Um plano só abre uma vez: se você fechar, ele fica fechado até você abrir.
+let announced: number | string | null = null
+async function openPlanPane($: EngineInterface) {
+  if (off) return
+  const key = (await read($, plan))?.startedAt ?? 'tasks'
+  if (announced === key) return
+  announced = key
+  try {
+    await $.ui.open({ id: PANE, title: TITLE })
+  } catch {
+    // Sem painel disponível o plano segue invisível até /subagentes.
+  }
+}
+
 export const register: Register = on => {
   lastLedgerCheck = Number.NEGATIVE_INFINITY
   cachedLedger = null
@@ -230,6 +244,7 @@ export const register: Register = on => {
         return { ...base, todos: [...todos], phase: base.todos.length === 0 ? 'planejamento' : base.phase }
       })
       await update($, now, () => stamp)
+      if (todos.length > 0) await openPlanPane($)
     }
     const result = await next(e)
     if (e.tool === 'TaskCreate' && 'result' in result && result.result && !result.isError) {
@@ -240,6 +255,7 @@ export const register: Register = on => {
           ...list.filter(t => t.id !== id),
           { id, subject: created.subject ?? e.subject, status: 'pending' as TodoStatus, activeForm: e.activeForm ?? e.subject },
         ])
+        await openPlanPane($)
       }
     }
     if (e.tool === 'TaskUpdate' && 'result' in result && !result.isError) {
@@ -258,8 +274,9 @@ export const register: Register = on => {
     return result
   }).catch(($, e, next) => next(e))
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (off || e.props.hasSurvey) return next(e)
+  // O plano fica no painel de subagentes (um banner acima do prompt conflitava com a faixa do cache).
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    if (off) return next(e)
     // O atom só serve para redesenhar quem lê; o valor vem da leitura (com cache).
     await read($, ledger)
     const sdd = await refreshLedger($).catch(() => null)
@@ -289,7 +306,6 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        {below}
         <Box>
           <Text bold>Plano: </Text>
           <Text>{clip(source.goal, 70)}  </Text>
@@ -319,6 +335,7 @@ export const register: Register = on => {
               {t.status === 'in_progress' ? t.activeForm : t.content}
             </Text>
           ))}
+        {below}
       </Box>
     )
   })
