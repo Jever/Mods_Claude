@@ -250,10 +250,12 @@ async function scan($: EngineInterface): Promise<Row[]> {
     const row = await inspect($, dir, chatOnly)
     if (row && !found.has(row.name)) found.set(row.name, row)
   }
-  const rows: Row[] = MODS.map(m => {
+  // A tabela só dá nome e texto aos mods encontrados: um mod que não está instalado não tem linha.
+  const rows: Row[] = MODS.flatMap(m => {
     const hit = found.get(m.name)
+    if (!hit) return []
     found.delete(m.name)
-    return { ...m, switchable: hit ? hit.switchable : true, chatOnly: hit ? hit.chatOnly : false }
+    return [{ ...m, switchable: hit.switchable, chatOnly: hit.chatOnly }]
   })
   const rest = [...found.values()].sort((a, b) => a.title.localeCompare(b.title))
   return [...rows, ...rest.filter(r => !r.chatOnly), ...rest.filter(r => r.chatOnly)]

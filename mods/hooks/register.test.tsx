@@ -20,18 +20,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
       return { value: { isPlaced: true } } as never
     })
     on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
-    on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path in files }) as never)
-    on('fs.read', async ($, e) => {
-      const path = (e as { path: string }).path
-      if (!(path in files)) throw new Error(`ENOENT ${path}`)
-      return { value: files[path] } as never
-    })
-    on('fs.write', async ($, e) => {
-      const { path, text } = e as { path: string; text: string }
-      files[path] = text
-      return { value: undefined } as never
-    })
-    on('fs.list', async () => ({ value: [] }) as never)
+    machine(on, files)
     mock.env(on, {})
 
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -88,18 +77,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('command.register', async () => ({ value: undefined }) as never)
     mock.clock(on, { now: new Date(2026, 9, 15, 21, 0).getTime() })
     on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
-    on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path in files }) as never)
-    on('fs.read', async ($, e) => {
-      const path = (e as { path: string }).path
-      if (!(path in files)) throw new Error(`ENOENT ${path}`)
-      return { value: files[path] } as never
-    })
-    on('fs.write', async ($, e) => {
-      const { path, text } = e as { path: string; text: string }
-      files[path] = text
-      return { value: undefined } as never
-    })
-    on('fs.list', async () => ({ value: [] }) as never)
+    machine(on, files)
     mock.env(on, {})
 
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -126,18 +104,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('command.register', async () => ({ value: undefined }) as never)
     mock.clock(on, { now: new Date(2026, 9, 15, 21, 0).getTime() })
     on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
-    on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path in files }) as never)
-    on('fs.read', async ($, e) => {
-      const path = (e as { path: string }).path
-      if (!(path in files)) throw new Error(`ENOENT ${path}`)
-      return { value: files[path] } as never
-    })
-    on('fs.write', async ($, e) => {
-      const { path, text } = e as { path: string; text: string }
-      files[path] = text
-      return { value: undefined } as never
-    })
-    on('fs.list', async () => ({ value: [] }) as never)
+    machine(on, files)
     mock.env(on, {})
 
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
@@ -195,7 +162,46 @@ const dirs: Record<string, string[]> = {
   '/.claude/plugins/cache/anthropic': ['replay-theater'],
   '/.claude/plugins/cache/anthropic/replay-theater': ['0.1.0'],
 }
+// The mods installed from the jeverjm marketplace: in the plugin cache, one folder per mod and version.
+for (const name of INSTALLED) {
+  const base = `/.claude/plugins/cache/jeverjm/${name}/0.1.0`
+  disk[`${base}/.claude-plugin/plugin.json`] = JSON.stringify({ name, description: `${name} plugin` })
+  disk[`${base}/hooks/hooks.json`] = JSON.stringify({ modules: ['./register.tsx'] })
+  disk[`${base}/hooks/register.tsx`] = "'switches.json'"
+  dirs[`/.claude/plugins/cache/jeverjm/${name}`] = ['0.1.0']
+}
+dirs['/.claude/plugins/cache/jeverjm'] = [...INSTALLED]
+dirs['/.claude/plugins/cache'] = ['anthropic', 'jeverjm']
+
 const onDisk = (path: string) => Object.keys(disk).find(k => path.endsWith(k))
+
+// A fake machine for every test: the files written in the test, plus the disk below (matched by the end of the path).
+const machine = (on: On, files: Record<string, string>) => {
+  on('fs.exists', async ($, e) => {
+    const path = (e as { path: string }).path
+    return { value: path in files || onDisk(path) !== undefined } as never
+  })
+  on('fs.read', async ($, e) => {
+    const path = (e as { path: string }).path
+    if (path in files) return { value: files[path] } as never
+    const k = onDisk(path)
+    if (k === undefined) throw new Error(`ENOENT ${path}`)
+    return { value: disk[k] } as never
+  })
+  on('fs.write', async ($, e) => {
+    const { path, text } = e as { path: string; text: string }
+    files[path] = text
+    return { value: undefined } as never
+  })
+  on('fs.list', async ($, e) => {
+    const path = ((e as { path?: string }).path ?? '').replace(/\/+$/, '')
+    const dir = Object.keys(dirs).find(k => path.endsWith(k))
+    if (dir) return { value: (dirs[dir] ?? []).map(name => ({ name, kind: 'dir', size: 0, mtimeMs: 0, isLink: false })) } as never
+    const names = [...new Set(Object.keys(disk).filter(k => path.endsWith(k.slice(0, k.lastIndexOf('/')))).map(k => k.slice(k.lastIndexOf('/') + 1)))]
+    if (!names.length) throw new Error(`ENOENT ${path}`)
+    return { value: names.map(name => ({ name, kind: 'file', size: 10, mtimeMs: 0, isLink: false })) } as never
+  })
+}
 
 for (const surface of ['desktop', 'terminal'] as const) {
   test(`finds new mods by itself, and a mod without the switch gets a note (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
