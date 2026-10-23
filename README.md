@@ -69,6 +69,30 @@ O `mods` é opcional, mas é o único jeito de ligar e desligar os outros pela t
 /plugin uninstall cache-keeper@jeverjm
 ```
 
+### Atualizar
+
+Quem já instalou pelo GitHub atualiza em duas etapas: primeiro o marketplace, depois os plugins.
+
+No terminal:
+
+```bash
+claude plugin marketplace update jeverjm
+for p in cache-keeper prompt-enhancer plan-progress chat-inventory screen-share mods; do
+  claude plugin update "$p@jeverjm"
+done
+```
+
+No Claude Code:
+
+```
+/plugin marketplace update jeverjm
+/plugin update cache-keeper@jeverjm
+```
+
+Reinicie o Claude Code depois. A atualização só vale após o reinício.
+
+Se a atualização não trouxer a versão nova, confira com `claude plugin list`. Quem instalou antes do nome `jeverjm` (marketplace `meus-mods`) precisa reinstalar, porque o marketplace antigo foi removido.
+
 ## Como cada mod funciona
 
 ### cache-keeper

@@ -1,0 +1,24 @@
+# Dependências e saídas de build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs e temporários
+*.log
+*.tmp
+.scratch*
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Configurações locais do Claude Code e segredos
+.claude/settings.local.json
+.env
+.env.*
