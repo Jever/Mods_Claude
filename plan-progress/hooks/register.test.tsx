@@ -1,5 +1,10 @@
 import type { On, RenderPropsOf } from 'claude-code'
 import { test, expect, mock, type Engine } from 'claude-code/testing'
+import { homeFrom } from './home'
+
+// O engine entrega cada caminho ao hook como o sistema escreve: D:\proj\x no Windows, /proj/x no Linux
+// e no macOS. Os discos falsos daqui usam o jeito do Linux, então um caminho do Windows é lido como um deles.
+const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:(?=\/)/, '')
 
 const todos = [
   { content: 'Pesquisar', status: 'completed' as const, activeForm: 'Pesquisando' },
@@ -101,7 +106,8 @@ test('o plano é gravado no arquivo compartilhado quando muda', async ($, on) =>
   on('command.register', async () => ({ value: undefined }) as never)
   on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
   on('fs.write', async ($, e) => {
-    const { path, text } = e as { path: string; text: string }
+    const { text } = e as { path: string; text: string }
+    const path = posix((e as { path: string }).path)
     writes[path] = text
     return { value: undefined } as never
   })
@@ -120,7 +126,7 @@ test('desligado no /mods, a faixa não desenha nada próprio', async ($, on) => 
   noLedger(on)
   const switches = '{"plan-progress": false}'
   on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
-  on('fs.exists', async ($, e) => ({ value: (e as { path: string }).path.endsWith('/.claude/mods/switches.json') }) as never)
+  on('fs.exists', async ($, e) => ({ value: posix((e as { path: string }).path).endsWith('/.claude/mods/switches.json') }) as never)
   on('fs.read', async () => ({ value: switches }) as never)
   on('tool.call', { tool: 'TodoWrite' }, () => ({ result: { oldTodos: [], newTodos: todos } }))
   baseBand(on)
@@ -207,14 +213,14 @@ test('o ledger do plano mostra tarefas concluídas e a atual', async ($, on) => 
   mock.clock(on, { now: 5000 })
   on('session.cwd', () => ({ value: '/proj' }))
   on('fs.list', ($, e) => {
-    if (e.path !== '/proj/.superpowers/sdd') throw new Error('ENOENT')
+    if (posix(e.path) !== '/proj/.superpowers/sdd') throw new Error('ENOENT')
     return { value: [{ name: '2026-10-20-m9', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }
   })
   on('fs.stat', () => ({ value: { kind: 'file' as const, size: 10, mtimeMs: 4000, isLink: false } }))
   on('fs.read', ($, e) => {
-    if (e.path === '/proj/.superpowers/sdd/2026-10-20-m9/progress.md') return { value: LEDGER }
-    if (e.path === '/proj/docs/superpowers/plans/m9.md') return { value: PLAN }
-    throw new Error(`ENOENT ${e.path}`)
+    if (posix(e.path) === '/proj/.superpowers/sdd/2026-10-20-m9/progress.md') return { value: LEDGER }
+    if (posix(e.path) === '/proj/docs/superpowers/plans/m9.md') return { value: PLAN }
+    throw new Error(`ENOENT ${posix(e.path)}`)
   })
   baseBand(on)
   const ui = await mountBand($)
@@ -230,7 +236,7 @@ test('ledger antigo e concluído não ocupa a faixa', async ($, on) => {
   on('fs.list', () => ({ value: [{ name: 'velho', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }))
   on('fs.stat', () => ({ value: { kind: 'file' as const, size: 10, mtimeMs: 0, isLink: false } }))
   on('fs.read', ($, e) => ({
-    value: e.path.endsWith('progress.md') ? '# SDD ledger — plan: p.md\nTask 1: complete (x)' : '# Velho\n### Task 1: Única',
+    value: posix(e.path).endsWith('progress.md') ? '# SDD ledger — plan: p.md\nTask 1: complete (x)' : '# Velho\n### Task 1: Única',
   }))
   baseBand(on)
   const ui = await mountBand($)
@@ -242,19 +248,36 @@ test('acha o ledger dentro de um worktree do projeto', async ($, on) => {
   mock.clock(on, { now: 5000 })
   on('session.cwd', () => ({ value: '/proj' }))
   on('fs.list', ($, e) => {
-    if (e.path === '/proj/.worktrees') return { value: [{ name: 'paridade', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }
-    if (e.path === '/proj/.worktrees/paridade/.superpowers/sdd') return { value: [{ name: 'm9', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }
-    throw new Error(`ENOENT ${e.path}`)
+    if (posix(e.path) === '/proj/.worktrees') return { value: [{ name: 'paridade', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }
+    if (posix(e.path) === '/proj/.worktrees/paridade/.superpowers/sdd') return { value: [{ name: 'm9', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }] }
+    throw new Error(`ENOENT ${posix(e.path)}`)
   })
   on('fs.stat', () => ({ value: { kind: 'file' as const, size: 10, mtimeMs: 4000, isLink: false } }))
   on('fs.read', ($, e) => {
-    if (e.path === '/proj/.worktrees/paridade/.superpowers/sdd/m9/progress.md') return { value: '# SDD ledger — plan: docs/m9.md\nTask 1: complete (x)' }
-    if (e.path === '/proj/.worktrees/paridade/docs/m9.md') return { value: '# M9 no worktree\n### Task 1: A\n### Task 2: B' }
-    throw new Error(`ENOENT ${e.path}`)
+    if (posix(e.path) === '/proj/.worktrees/paridade/.superpowers/sdd/m9/progress.md') return { value: '# SDD ledger — plan: docs/m9.md\nTask 1: complete (x)' }
+    if (posix(e.path) === '/proj/.worktrees/paridade/docs/m9.md') return { value: '# M9 no worktree\n### Task 1: A\n### Task 2: B' }
+    throw new Error(`ENOENT ${posix(e.path)}`)
   })
   baseBand(on)
   const ui = await mountBand($)
   expect(await ui.find({ text: /M9 no worktree/ })).toBeTruthy()
   expect(await ui.find({ text: /50% \(1\/2\)/ })).toBeTruthy()
   await ui.unmount()
+})
+
+// A pasta home vem da pasta do plugin. No Windows ela chega com barras invertidas.
+test('a pasta home sai da pasta do plugin, no Windows e no Linux', async () => {
+  expect(homeFrom('C:\\Users\\test user\\.claude\\plugins\\cache\\jeverjm\\plan-progress\\0.1.0'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/plan-progress/0.1.0'), 'Linux').toBe('/home/test')
+  expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/plan-progress/0.1.0'), 'macOS').toBe('/Users/test')
+  expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/plan-progress/0.1.0'), 'um nome do Linux com barra invertida').toBe('/home/a\\b')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/plan-progress/0.1.0', '/outra'), 'dentro de ~/.claude a home do sistema não conta').toBe('/home/test')
+})
+
+// Lido de uma pasta (marketplace de pasta, --plugin-dir), o plugin fica fora de ~/.claude: vale a home do sistema.
+test('fora de ~/.claude, a pasta home é a do sistema', async () => {
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\plan-progress', 'C:\\Users\\test user'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/opt/mods/plan-progress', '/home/test/'), 'Linux').toBe('/home/test')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\plan-progress'), 'sem home do sistema, no Windows').toBe('D:/ProjetosPessoais/Mods_Claude/plan-progress')
+  expect(homeFrom('/opt/mods/plan-progress'), 'sem home do sistema, no Linux').toBe('/opt/mods/plan-progress')
 })

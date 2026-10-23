@@ -1,4 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
+import { homeFrom, splitDirList } from './home'
+
+// The engine hands a hook each path the way the platform writes it: D:\proj\x on Windows, /proj/x on
+// Linux and macOS. The fake disks here are keyed the Linux way, so a Windows path is read as one.
+const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:(?=\/)/, '')
 
 const props = { title: 'Mods', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as never
 
@@ -145,9 +150,9 @@ const disk: Record<string, string> = {
   '/.claude/mods/chat-inventory/.claude-plugin/plugin.json': JSON.stringify({ name: 'chat-inventory', description: 'long text' }),
   '/.claude/mods/chat-inventory/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
   '/.claude/mods/chat-inventory/hooks/register.tsx': "readSwitch('switches.json')",
-  '/opt/extra/alpha-env/.claude-plugin/plugin.json': JSON.stringify({ name: 'alpha-env', description: 'Found through the env list' }),
-  '/opt/extra/alpha-env/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
-  '/opt/extra/alpha-env/hooks/register.tsx': "'switches.json'",
+  '/opt/extra\b/alpha-env/.claude-plugin/plugin.json': JSON.stringify({ name: 'alpha-env', description: 'Found through the env list' }),
+  '/opt/extra\b/alpha-env/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
+  '/opt/extra\b/alpha-env/hooks/register.tsx': "'switches.json'",
   '/.claude/plugins/cache/anthropic/replay-theater/0.1.0/.claude-plugin/plugin.json': JSON.stringify({ name: 'replay-theater', description: 'Replays each edit' }),
   '/.claude/plugins/cache/anthropic/replay-theater/0.1.0/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
   '/.claude/plugins/cache/anthropic/replay-theater/0.1.0/hooks/register.tsx': "await $.command.register({ name: 'replay' })",
@@ -178,23 +183,24 @@ const onDisk = (path: string) => Object.keys(disk).find(k => path.endsWith(k))
 // A fake machine for every test: the files written in the test, plus the disk below (matched by the end of the path).
 const machine = (on: On, files: Record<string, string>) => {
   on('fs.exists', async ($, e) => {
-    const path = (e as { path: string }).path
+    const path = posix((e as { path: string }).path)
     return { value: path in files || onDisk(path) !== undefined } as never
   })
   on('fs.read', async ($, e) => {
-    const path = (e as { path: string }).path
+    const path = posix((e as { path: string }).path)
     if (path in files) return { value: files[path] } as never
     const k = onDisk(path)
     if (k === undefined) throw new Error(`ENOENT ${path}`)
     return { value: disk[k] } as never
   })
   on('fs.write', async ($, e) => {
-    const { path, text } = e as { path: string; text: string }
+    const { text } = e as { path: string; text: string }
+    const path = posix((e as { path: string }).path)
     files[path] = text
     return { value: undefined } as never
   })
   on('fs.list', async ($, e) => {
-    const path = ((e as { path?: string }).path ?? '').replace(/\/+$/, '')
+    const path = posix((e as { path?: string }).path ?? '').replace(/\/+$/, '')
     const dir = Object.keys(dirs).find(k => path.endsWith(k))
     if (dir) return { value: (dirs[dir] ?? []).map(name => ({ name, kind: 'dir', size: 0, mtimeMs: 0, isLink: false })) } as never
     const names = [...new Set(Object.keys(disk).filter(k => path.endsWith(k.slice(0, k.lastIndexOf('/')))).map(k => k.slice(k.lastIndexOf('/') + 1)))]
@@ -213,30 +219,31 @@ for (const surface of ['desktop', 'terminal'] as const) {
     on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
     on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
     on('fs.exists', async ($, e) => {
-      const path = (e as { path: string }).path
+      const path = posix((e as { path: string }).path)
       return { value: path in files || onDisk(path) !== undefined } as never
     })
     on('fs.read', async ($, e) => {
-      const path = (e as { path: string }).path
+      const path = posix((e as { path: string }).path)
       if (path in files) return { value: files[path] } as never
       const k = onDisk(path)
       if (k === undefined) throw new Error(`ENOENT ${path}`)
       return { value: disk[k] } as never
     })
     on('fs.write', async ($, e) => {
-      const { path, text } = e as { path: string; text: string }
+      const { text } = e as { path: string; text: string }
+      const path = posix((e as { path: string }).path)
       files[path] = text
       return { value: undefined } as never
     })
     on('fs.list', async ($, e) => {
-      const path = ((e as { path?: string }).path ?? '').replace(/\/+$/, '')
+      const path = posix((e as { path?: string }).path ?? '').replace(/\/+$/, '')
       const dir = Object.keys(dirs).find(k => path.endsWith(k))
       if (dir) return { value: (dirs[dir] ?? []).map(name => ({ name, kind: 'dir', size: 0, mtimeMs: 0, isLink: false })) } as never
       const names = [...new Set(Object.keys(disk).filter(k => path.endsWith(k.slice(0, k.lastIndexOf('/')))).map(k => k.slice(k.lastIndexOf('/') + 1)))]
       if (!names.length) throw new Error(`ENOENT ${path}`)
       return { value: names.map(name => ({ name, kind: 'file', size: 10, mtimeMs: 0, isLink: false })) } as never
     })
-    mock.env(on, { CLAUDE_CODE_PLUGIN_DIRS: '~/.claude/mods/context-meter:/opt/extra/alpha-env/' })
+    mock.env(on, { CLAUDE_CODE_PLUGIN_DIRS: '~/.claude/mods/context-meter:/opt/extra\b/alpha-env/' })
 
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     await $.command.run({ command: 'mods', args: '' } as never)
@@ -282,3 +289,29 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: 'Zeta Notes is off in every chat.' }), 'note').toBeDefined()
   })
 }
+
+// The home folder comes from the plugin folder, which arrives with backslashes on Windows.
+test('the home folder comes from the plugin folder, on Windows and on Linux', async () => {
+  expect(homeFrom('C:\\Users\\test user\\.claude\\plugins\\cache\\jeverjm\\mods\\0.1.0'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'Linux').toBe('/home/test')
+  expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'macOS').toBe('/Users/test')
+  expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'a Linux name with a backslash').toBe('/home/a\\b')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/mods/0.1.0', '/other'), "inside ~/.claude the system's home does not count").toBe('/home/test')
+})
+
+// Read from a folder (a folder marketplace, --plugin-dir), the plugin sits outside ~/.claude: the system's home is used.
+test("outside ~/.claude, the home folder is the system's", async () => {
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\mods', 'C:\\Users\\test user'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/opt/mods/mods', '/home/test/'), 'Linux').toBe('/home/test')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\mods'), "no system home, on Windows").toBe('D:/ProjetosPessoais/Mods_Claude/mods')
+  expect(homeFrom('/opt/mods/mods'), 'no system home, on Linux').toBe('/opt/mods/mods')
+})
+
+// CLAUDE_CODE_PLUGIN_DIRS is split by ':' on Linux and macOS and by ';' on Windows.
+test('the plugin folder list splits the way the platform writes it', async () => {
+  expect(splitDirList('~/.claude/mods/a:/opt/extra/b/', false), 'Linux').toEqual(['~/.claude/mods/a', '/opt/extra/b/'])
+  expect(splitDirList('/opt/a;b:/opt/c', false), "a ';' is part of a Linux name").toEqual(['/opt/a;b', '/opt/c'])
+  expect(splitDirList('C:\\mods\\a;D:/mods/b', true), 'Windows').toEqual(['C:\\mods\\a', 'D:/mods/b'])
+  expect(splitDirList('~/.claude/mods/a:/opt/extra/b/', true), 'a list written the Linux way, on Windows').toEqual(['~/.claude/mods/a', '/opt/extra/b/'])
+  expect(splitDirList('C:\\mods\\a:D:\\mods\\b', true), "':' between Windows folders").toEqual(['C:\\mods\\a', 'D:\\mods\\b'])
+})

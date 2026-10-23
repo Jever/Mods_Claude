@@ -1,18 +1,22 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { findHome } from './home'
+
 const isBusy = atom({ plugin: 'prompt-enhancer', key: 'isBusy' } as const, false)
 
 // O switchboard /mods desliga o mod em todos os chats pelo switches.json.
 const NAME = 'prompt-enhancer'
 let off = false
+// A pasta home, lida no session.start.
+let home = ''
 
-const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
+const switchesPath = () => `${home}/.claude/mods/switches.json`
 
 async function readSwitch($: EngineInterface) {
   let nowOff = off
   try {
-    const path = switchesPath($)
+    const path = switchesPath()
     if (await $.fs.exists(path)) {
       const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
       nowOff = json[NAME] === false
@@ -100,6 +104,7 @@ export const register: Register = (on, options) => {
   const model = typeof options?.model === 'string' && options.model ? options.model : 'sonnet'
 
   on('session.start', async ($, e, next) => {
+    home = await findHome($)
     await readSwitch($).catch(() => undefined)
     $.clock.every(3000, () => {
       void readSwitch($).catch(() => undefined)

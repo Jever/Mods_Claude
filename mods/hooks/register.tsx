@@ -1,4 +1,5 @@
 import type { EngineInterface, Register } from 'claude-code'
+import { findHome, isWindowsPath, splitDirList } from './home'
 
 // The Mods pane: one row per knowledge-work mod, with an On/Off switch that works
 // in every chat (switches.json). Mods that draw something also get Shown/Hidden,
@@ -34,13 +35,13 @@ const MODS: readonly Mod[] = [
 
 // Module variables reset on a reload; the switches themselves live in the file.
 let sid = ''
+let home = ''
 let lastRaw = ''
 let cache: { at: number; rows: Row[] } | null = null
 
 const NOT_SWITCHABLE = 'Not switchable yet. Ask Claude: add the /mods switch to this mod.'
 
-const homeOf = ($: EngineInterface) => $.plugin.root.split('/.claude/')[0] ?? ''
-const switchesPath = ($: EngineInterface) => `${homeOf($)}/.claude/mods/switches.json`
+const switchesPath = () => `${home}/.claude/mods/switches.json`
 
 function cut(s: string, n: number) {
   if (n <= 0) return ''
@@ -49,9 +50,8 @@ function cut(s: string, n: number) {
 
 async function log($: EngineInterface, where: string, err: unknown) {
   try {
-    const dir = `${homeOf($)}/.claude/mods-logs`
+    const dir = `${home}/.claude/mods-logs`
     const file = `${dir}/mods.log`
-    await $.process.run(['mkdir', '-p', dir])
     let old = ''
     try {
       old = String(await $.fs.read(file))
@@ -68,7 +68,7 @@ async function log($: EngineInterface, where: string, err: unknown) {
 
 async function readRaw($: EngineInterface) {
   try {
-    const path = switchesPath($)
+    const path = switchesPath()
     if (!(await $.fs.exists(path))) return ''
     return String(await $.fs.read(path))
   } catch {
@@ -92,10 +92,10 @@ async function readSwitches($: EngineInterface) {
 const isOff = (json: Record<string, unknown>, name: string) => json[name] === false
 const isHidden = (json: Record<string, unknown>, name: string) => json[`${name}:hidden`] === true
 
+// $.fs.write makes the folders it needs, on every platform.
 async function save($: EngineInterface, json: Record<string, unknown>) {
-  await $.process.run(['mkdir', '-p', `${homeOf($)}/.claude/mods`])
   const text = `${JSON.stringify(json, null, 2)}\n`
-  await $.fs.write(switchesPath($), text)
+  await $.fs.write(switchesPath(), text)
   lastRaw = text
 }
 
@@ -122,7 +122,7 @@ async function flipHidden($: EngineInterface, name: string) {
 
 async function askOpen($: EngineInterface, name: string) {
   if (!sid) throw new Error('no session id')
-  await $.fs.write(`${homeOf($)}/.claude/mods/.open-${name}-${sid}`, '')
+  await $.fs.write(`${home}/.claude/mods/.open-${name}-${sid}`, '')
 }
 
 async function readText($: EngineInterface, path: string) {
@@ -157,7 +157,7 @@ async function cacheDirs($: EngineInterface, home: string) {
   return out
 }
 
-// CLAUDE_CODE_PLUGIN_DIRS: folders split by ':', '~' meaning the home folder.
+// CLAUDE_CODE_PLUGIN_DIRS: folders split by the platform's separator, '~' meaning the home folder.
 async function envDirs($: EngineInterface) {
   let raw: string | undefined
   try {
@@ -166,11 +166,11 @@ async function envDirs($: EngineInterface) {
     return []
   }
   if (!raw) return []
-  const home = homeOf($)
-  return raw
-    .split(':')
+  const windows = isWindowsPath($.plugin.root)
+  return splitDirList(raw, windows)
     .map(x => x.trim())
     .filter(Boolean)
+    .map(x => (windows ? x.replace(/\\/g, '/') : x))
     .map(x => (x === '~' ? home : x.startsWith('~/') ? `${home}${x.slice(1)}` : x))
     .map(x => x.replace(/\/+$/, ''))
 }
@@ -236,7 +236,6 @@ async function inspect($: EngineInterface, dir: string, chatOnly: boolean): Prom
 
 // Known mods first in their old order, then new ones A to Z, then this chat's own.
 async function scan($: EngineInterface): Promise<Row[]> {
-  const home = homeOf($)
   const found = new Map<string, Row>()
   const dirs: [string, boolean][] = []
   for (const d of await listDirs($, `${home}/.claude/mods`)) dirs.push([d, false])
@@ -298,6 +297,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
       sid = await $.session.id()
+      home = await findHome($)
       cache = null
       await $.command.register({ name: 'mods', description: 'Open the Mods pane: turn each mod on or off, or show or hide it, in every chat', immediate: true })
       lastRaw = await readRaw($)

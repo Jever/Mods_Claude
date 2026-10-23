@@ -3,6 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { Helper, HelperPhase, Step, StepKind } from '../types'
 import { cardBarSvg, CARD_BAR_H } from './cards'
 import { connectorName, splitTool } from './connectors'
+import { findHome } from './home'
 import { FRAMES, hueOf, HUES, petSvg } from './pets'
 
 // Cards dos subagentes, portados do helper-desk. O painel abre sozinho quando um
@@ -386,7 +387,7 @@ function barParts(phase: HelperPhase, w: number, tick: number, seat: number): [s
 
 /** Na abertura da sessão: registra o comando e carrega o último painel salvo (um reload segue dele). */
 export async function startSubagents($: EngineInterface, isOff: () => boolean) {
-  home = $.plugin.root.split('/.claude/')[0] ?? ''
+  home = await findHome($)
   await $.command.register({ name: 'subagentes', description: 'Abre o painel de subagentes: um card com o andamento de cada um', immediate: true })
   if (!helpers.length) {
     const { value } = await $.state.get(HELPERS)

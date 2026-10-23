@@ -1,6 +1,11 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { BAR, FADE, mask, redact } from './mask'
+import { homeFrom } from './home'
+
+// The engine hands a hook each path the way the platform writes it: D:\proj\x on Windows, /proj/x on
+// Linux and macOS. The fake disks here are keyed the Linux way, so a Windows path is read as one.
+const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:(?=\/)/, '')
 
 const PRIVATE = 'Mail jane.doe@acme.com or call +44 7700 900123. The deal is $4,250.00 for 2026, we used 182k tokens.'
 // The same line with each private span drawn as a bar of its own length.
@@ -164,7 +169,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     let switches = ''
     const statuses: (string | undefined)[] = []
     const seen: Record<string, unknown> = {}
-    const isSwitches = (e: unknown) => (e as { path: string }).path.endsWith('/.claude/mods/switches.json')
+    const isSwitches = (e: unknown) => posix((e as { path: string }).path).endsWith('/.claude/mods/switches.json')
     on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
     on('session.id', async () => ({ value: 'sid' }) as never)
     on('command.register', async () => ({ value: { command: 'screen-share' } }) as never)
@@ -246,4 +251,21 @@ test('mask: names only where the text says it is a person', async () => {
   for (const [input, want] of cases) expect(tag(input), input).toBe(want)
   const line = 'From: Jane Doe <jane@x.com>, call +44 7700 900123 about $4,250.00'
   expect(mask(line).length, 'bars keep the line length').toBe(line.length)
+})
+
+// The home folder comes from the plugin folder, which arrives with backslashes on Windows.
+test('the home folder comes from the plugin folder, on Windows and on Linux', async () => {
+  expect(homeFrom('C:\\Users\\test user\\.claude\\plugins\\cache\\jeverjm\\screen-share\\0.1.0'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/screen-share/0.1.0'), 'Linux').toBe('/home/test')
+  expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/screen-share/0.1.0'), 'macOS').toBe('/Users/test')
+  expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/screen-share/0.1.0'), 'a Linux name with a backslash').toBe('/home/a\\b')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/screen-share/0.1.0', '/other'), "inside ~/.claude the system's home does not count").toBe('/home/test')
+})
+
+// Read from a folder (a folder marketplace, --plugin-dir), the plugin sits outside ~/.claude: the system's home is used.
+test("outside ~/.claude, the home folder is the system's", async () => {
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\screen-share', 'C:\\Users\\test user'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/opt/mods/screen-share', '/home/test/'), 'Linux').toBe('/home/test')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\screen-share'), "no system home, on Windows").toBe('D:/ProjetosPessoais/Mods_Claude/screen-share')
+  expect(homeFrom('/opt/mods/screen-share'), 'no system home, on Linux').toBe('/opt/mods/screen-share')
 })

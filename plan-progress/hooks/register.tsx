@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
 import { planBarSvg } from './cards'
+import { findHome } from './home'
 import { nestable, PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
@@ -14,12 +15,12 @@ const ledger = atom({ plugin: 'plan-progress', key: 'ledger' } as const, null)
 const NAME = 'plan-progress'
 let off = false
 
-const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
+const switchesPath = () => `${home}/.claude/mods/switches.json`
 
 async function readSwitch($: EngineInterface) {
   let nowOff = off
   try {
-    const path = switchesPath($)
+    const path = switchesPath()
     if (await $.fs.exists(path)) {
       const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
       nowOff = json[NAME] === false
@@ -228,7 +229,7 @@ async function syncPlanFile($: EngineInterface) {
     const key = JSON.stringify({ title: src.goal, steps })
     if (key === lastPlanKey) return
     lastPlanKey = key
-    await $.process.run(['mkdir', '-p', `${home}/.claude/mods-state`])
+    // O $.fs.write cria as pastas que faltam, em qualquer sistema.
     const updatedAt = new Date(await $.clock.now()).toISOString()
     await $.fs.write(`${home}/.claude/mods-state/plan-${sid}.json`, `${JSON.stringify({ title: src.goal, steps, updatedAt }, null, 2)}\n`)
   } catch {
@@ -256,7 +257,7 @@ export const register: Register = on => {
   registerSubagents(on, () => off)
 
   on('session.start', async ($, e, next) => {
-    home = $.plugin.root.split('/.claude/')[0] ?? ''
+    home = await findHome($)
     sid = await $.session.id().catch(() => '')
     await update($, now, () => 0)
     $.clock.every(PLAN_TICK_MS, () => {
