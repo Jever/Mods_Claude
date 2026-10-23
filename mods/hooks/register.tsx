@@ -1,4 +1,5 @@
 import type { EngineInterface, Register } from 'claude-code'
+import { homeFrom, isWindowsPath, splitDirList } from './home'
 
 // The Mods pane: one row per knowledge-work mod, with an On/Off switch that works
 // in every chat (switches.json). Mods that draw something also get Shown/Hidden,
@@ -39,7 +40,7 @@ let cache: { at: number; rows: Row[] } | null = null
 
 const NOT_SWITCHABLE = 'Not switchable yet. Ask Claude: add the /mods switch to this mod.'
 
-const homeOf = ($: EngineInterface) => $.plugin.root.split('/.claude/')[0] ?? ''
+const homeOf = ($: EngineInterface) => homeFrom($.plugin.root)
 const switchesPath = ($: EngineInterface) => `${homeOf($)}/.claude/mods/switches.json`
 
 function cut(s: string, n: number) {
@@ -51,7 +52,6 @@ async function log($: EngineInterface, where: string, err: unknown) {
   try {
     const dir = `${homeOf($)}/.claude/mods-logs`
     const file = `${dir}/mods.log`
-    await $.process.run(['mkdir', '-p', dir])
     let old = ''
     try {
       old = String(await $.fs.read(file))
@@ -92,8 +92,8 @@ async function readSwitches($: EngineInterface) {
 const isOff = (json: Record<string, unknown>, name: string) => json[name] === false
 const isHidden = (json: Record<string, unknown>, name: string) => json[`${name}:hidden`] === true
 
+// $.fs.write makes the folders it needs, on every platform.
 async function save($: EngineInterface, json: Record<string, unknown>) {
-  await $.process.run(['mkdir', '-p', `${homeOf($)}/.claude/mods`])
   const text = `${JSON.stringify(json, null, 2)}\n`
   await $.fs.write(switchesPath($), text)
   lastRaw = text
@@ -157,7 +157,7 @@ async function cacheDirs($: EngineInterface, home: string) {
   return out
 }
 
-// CLAUDE_CODE_PLUGIN_DIRS: folders split by ':', '~' meaning the home folder.
+// CLAUDE_CODE_PLUGIN_DIRS: folders split by the platform's separator, '~' meaning the home folder.
 async function envDirs($: EngineInterface) {
   let raw: string | undefined
   try {
@@ -167,10 +167,11 @@ async function envDirs($: EngineInterface) {
   }
   if (!raw) return []
   const home = homeOf($)
-  return raw
-    .split(':')
+  const windows = isWindowsPath($.plugin.root)
+  return splitDirList(raw, windows)
     .map(x => x.trim())
     .filter(Boolean)
+    .map(x => (windows ? x.replace(/\\/g, '/') : x))
     .map(x => (x === '~' ? home : x.startsWith('~/') ? `${home}${x.slice(1)}` : x))
     .map(x => x.replace(/\/+$/, ''))
 }

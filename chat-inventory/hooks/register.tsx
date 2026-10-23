@@ -3,6 +3,7 @@ import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { CallRow, ConnectorRow, FileRow, Inventory, Plan, PlanStep, SkillRow } from '../types'
 import { CONNECTOR_NAMES, connectorName as nameOf, splitTool } from './connectors'
+import { homeFrom } from './home'
 import { LOGOS } from './logos'
 
 const PLUGIN = 'chat-inventory'
@@ -199,7 +200,7 @@ async function logError($: EngineInterface, where: string, err: unknown) {
     try {
       old = String(await $.fs.read(path))
     } catch {
-      await $.process.run(['mkdir', '-p', `${home}/.claude/mods-logs`])
+      // No log yet: $.fs.write makes the file and its folders.
     }
     const line = `${new Date(await $.clock.now()).toISOString()} ${where}: ${String(err instanceof Error ? err.message : err)}\n`
     await $.fs.write(path, old + line)
@@ -550,7 +551,6 @@ async function setHidden($: EngineInterface, value: boolean) {
     const json = await readSwitches($)
     if (value) json[HIDE_KEY] = true
     else delete json[HIDE_KEY]
-    await $.process.run(['mkdir', '-p', `${home}/.claude/mods`])
     await $.fs.write(switchesPath(), `${JSON.stringify(json, null, 2)}\n`)
   } catch (err) {
     await logError($, 'save hidden', err)
@@ -600,7 +600,7 @@ const KNOWN_KEYS = [...new Set([...Object.keys(LOGOS), ...[...CONNECTOR_NAMES, .
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    home = $.plugin.root.split('/.claude/')[0] ?? ''
+    home = homeFrom($.plugin.root)
     await $.command.register({ name: 'inventory', description: 'Show the connectors, files and skills this chat used', immediate: true })
     await readSwitch($)
     if (!switchTimer)

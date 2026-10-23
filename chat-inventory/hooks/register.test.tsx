@@ -1,4 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
+import { homeFrom } from './home'
+
+// The engine hands a hook each path the way the platform writes it: D:\proj\x on Windows, /proj/x on
+// Linux and macOS. The fake disks here are keyed the Linux way, so a Windows path is read as one.
+const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:(?=\/)/, '')
 
 type On = Parameters<NonNullable<Parameters<typeof test>[2]>>[1]
 
@@ -40,10 +45,11 @@ function setup(on: On, files: Record<string, string>, opened: string[], runs: st
       },
     }) as never,
   )
-  on('fs.exists', async ($, e) => ({ value: disk((e as { path: string }).path) in files }) as never)
-  on('fs.read', async ($, e) => ({ value: files[disk((e as { path: string }).path)] ?? '' }) as never)
+  on('fs.exists', async ($, e) => ({ value: disk(posix((e as { path: string }).path)) in files }) as never)
+  on('fs.read', async ($, e) => ({ value: files[disk(posix((e as { path: string }).path))] ?? '' }) as never)
   on('fs.write', async ($, e) => {
-    const { path, text } = e as { path: string; text: string }
+    const { text } = e as { path: string; text: string }
+    const path = posix((e as { path: string }).path)
     files[disk(path)] = text
     return { value: undefined } as never
   })
@@ -386,3 +392,13 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await ui.find({ type: 'Text', text: /^Files read$/ }), 'Files read line').toBeDefined()
   })
 }
+
+// The home folder comes from the plugin folder, which arrives with backslashes on Windows.
+test('the home folder comes from the plugin folder, on Windows and on Linux', async () => {
+  expect(homeFrom('C:\\Users\\test user\\.claude\\plugins\\cache\\jeverjm\\chat-inventory\\0.1.0'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/chat-inventory/0.1.0'), 'Linux').toBe('/home/test')
+  expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/chat-inventory/0.1.0'), 'macOS').toBe('/Users/test')
+  expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/chat-inventory/0.1.0'), 'a Linux name with a backslash').toBe('/home/a\\b')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\chat-inventory'), 'outside ~/.claude, on Windows').toBe('D:/ProjetosPessoais/Mods_Claude/chat-inventory')
+  expect(homeFrom('/opt/mods/chat-inventory'), 'outside ~/.claude, on Linux').toBe('/opt/mods/chat-inventory')
+})

@@ -1,13 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { homeFrom } from './home'
+
 const isBusy = atom({ plugin: 'prompt-enhancer', key: 'isBusy' } as const, false)
 
 // O switchboard /mods desliga o mod em todos os chats pelo switches.json.
 const NAME = 'prompt-enhancer'
 let off = false
 
-const switchesPath = ($: EngineInterface) => `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods/switches.json`
+const switchesPath = ($: EngineInterface) => `${homeFrom($.plugin.root)}/.claude/mods/switches.json`
 
 async function readSwitch($: EngineInterface) {
   let nowOff = off
