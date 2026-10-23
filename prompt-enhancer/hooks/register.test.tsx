@@ -49,6 +49,13 @@ test('a pasta home sai da pasta do plugin, no Windows e no Linux', async () => {
   expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/prompt-enhancer/0.1.0'), 'Linux').toBe('/home/test')
   expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/prompt-enhancer/0.1.0'), 'macOS').toBe('/Users/test')
   expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/prompt-enhancer/0.1.0'), 'um nome do Linux com barra invertida').toBe('/home/a\\b')
-  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\prompt-enhancer'), 'fora de ~/.claude, no Windows').toBe('D:/ProjetosPessoais/Mods_Claude/prompt-enhancer')
-  expect(homeFrom('/opt/mods/prompt-enhancer'), 'fora de ~/.claude, no Linux').toBe('/opt/mods/prompt-enhancer')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/prompt-enhancer/0.1.0', '/outra'), 'dentro de ~/.claude a home do sistema não conta').toBe('/home/test')
+})
+
+// Lido de uma pasta (marketplace de pasta, --plugin-dir), o plugin fica fora de ~/.claude: vale a home do sistema.
+test('fora de ~/.claude, a pasta home é a do sistema', async () => {
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\prompt-enhancer', 'C:\\Users\\test user'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/opt/mods/prompt-enhancer', '/home/test/'), 'Linux').toBe('/home/test')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\prompt-enhancer'), 'sem home do sistema, no Windows').toBe('D:/ProjetosPessoais/Mods_Claude/prompt-enhancer')
+  expect(homeFrom('/opt/mods/prompt-enhancer'), 'sem home do sistema, no Linux').toBe('/opt/mods/prompt-enhancer')
 })

@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Ledger, Phase, Plan, Todo, TodoStatus, TrackedTask } from '../types'
 import { planBarSvg } from './cards'
-import { homeFrom } from './home'
+import { findHome } from './home'
 import { nestable, PANE, registerSubagents, startSubagents, TITLE, trackSubagentCall } from './subagents'
 
 const plan = atom({ plugin: 'plan-progress', key: 'plan' } as const, null)
@@ -15,12 +15,12 @@ const ledger = atom({ plugin: 'plan-progress', key: 'ledger' } as const, null)
 const NAME = 'plan-progress'
 let off = false
 
-const switchesPath = ($: EngineInterface) => `${homeFrom($.plugin.root)}/.claude/mods/switches.json`
+const switchesPath = () => `${home}/.claude/mods/switches.json`
 
 async function readSwitch($: EngineInterface) {
   let nowOff = off
   try {
-    const path = switchesPath($)
+    const path = switchesPath()
     if (await $.fs.exists(path)) {
       const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
       nowOff = json[NAME] === false
@@ -257,7 +257,7 @@ export const register: Register = on => {
   registerSubagents(on, () => off)
 
   on('session.start', async ($, e, next) => {
-    home = homeFrom($.plugin.root)
+    home = await findHome($)
     sid = await $.session.id().catch(() => '')
     await update($, now, () => 0)
     $.clock.every(PLAN_TICK_MS, () => {

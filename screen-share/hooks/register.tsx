@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { homeFrom } from './home'
+import { findHome } from './home'
 import { BAR, FADE, mask, maskDeep } from './mask'
 
 // Screen-Share Mode: /screen-share turns it on or off. (/share cannot be used: it
@@ -32,7 +32,7 @@ let off = false
 async function readSwitch($: EngineInterface) {
   let now = false
   try {
-    const path = `${homeFrom($.plugin.root)}/.claude/mods/switches.json`
+    const path = `${home}/.claude/mods/switches.json`
     if (await $.fs.exists(path)) {
       const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
       now = json[NAME] === false
@@ -122,7 +122,7 @@ export const register: Register = on => {
     })
     try {
       sid = await $.session.id()
-      home = homeFrom($.plugin.root)
+      home = await findHome($)
       await readSwitch($).catch(() => undefined)
       $.clock.every(3000, () => {
         void readSwitch($).catch(() => undefined)

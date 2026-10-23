@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, ModelForkResult, Register } from 'claude-code'
 
 import type { Clock, Warm } from '../types'
-import { homeFrom } from './home'
+import { findHome } from './home'
 
 const isBusy = atom({ plugin: 'cache-keeper', key: 'isBusy' } as const, false)
 const CLOCK = { plugin: 'cache-keeper', key: 'clock' } as const
@@ -53,12 +53,12 @@ let pinging = false
 const NAME = 'cache-keeper'
 let off = false
 
-const switchesPath = ($: EngineInterface) => `${homeFrom($.plugin.root)}/.claude/mods/switches.json`
+const switchesPath = () => `${home}/.claude/mods/switches.json`
 
 async function readSwitch($: EngineInterface) {
   let nowOff = off
   try {
-    const path = switchesPath($)
+    const path = switchesPath()
     if (await $.fs.exists(path)) {
       const json = JSON.parse(String(await $.fs.read(path))) as Record<string, unknown>
       nowOff = json[NAME] === false
@@ -296,7 +296,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     sid = await $.session.id()
-    home = homeFrom($.plugin.root)
+    home = await findHome($)
     await readSwitch($).catch(() => undefined)
     $.clock.every(3000, () => {
       void readSwitch($).catch(() => undefined)

@@ -296,8 +296,15 @@ test('the home folder comes from the plugin folder, on Windows and on Linux', as
   expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'Linux').toBe('/home/test')
   expect(homeFrom('/Users/test/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'macOS').toBe('/Users/test')
   expect(homeFrom('/home/a\\b/.claude/plugins/cache/jeverjm/mods/0.1.0'), 'a Linux name with a backslash').toBe('/home/a\\b')
-  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\mods'), 'outside ~/.claude, on Windows').toBe('D:/ProjetosPessoais/Mods_Claude/mods')
-  expect(homeFrom('/opt/mods/mods'), 'outside ~/.claude, on Linux').toBe('/opt/mods/mods')
+  expect(homeFrom('/home/test/.claude/plugins/cache/jeverjm/mods/0.1.0', '/other'), "inside ~/.claude the system's home does not count").toBe('/home/test')
+})
+
+// Read from a folder (a folder marketplace, --plugin-dir), the plugin sits outside ~/.claude: the system's home is used.
+test("outside ~/.claude, the home folder is the system's", async () => {
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\mods', 'C:\\Users\\test user'), 'Windows').toBe('C:/Users/test user')
+  expect(homeFrom('/opt/mods/mods', '/home/test/'), 'Linux').toBe('/home/test')
+  expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\mods'), "no system home, on Windows").toBe('D:/ProjetosPessoais/Mods_Claude/mods')
+  expect(homeFrom('/opt/mods/mods'), 'no system home, on Linux').toBe('/opt/mods/mods')
 })
 
 // CLAUDE_CODE_PLUGIN_DIRS is split by ':' on Linux and macOS and by ';' on Windows.

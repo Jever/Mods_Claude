@@ -3,7 +3,7 @@ import type { EngineInterface, Register, SessionMessage } from 'claude-code'
 
 import type { CallRow, ConnectorRow, FileRow, Inventory, Plan, PlanStep, SkillRow } from '../types'
 import { CONNECTOR_NAMES, connectorName as nameOf, splitTool } from './connectors'
-import { homeFrom } from './home'
+import { findHome } from './home'
 import { LOGOS } from './logos'
 
 const PLUGIN = 'chat-inventory'
@@ -600,7 +600,7 @@ const KNOWN_KEYS = [...new Set([...Object.keys(LOGOS), ...[...CONNECTOR_NAMES, .
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    home = homeFrom($.plugin.root)
+    home = await findHome($)
     await $.command.register({ name: 'inventory', description: 'Show the connectors, files and skills this chat used', immediate: true })
     await readSwitch($)
     if (!switchTimer)
