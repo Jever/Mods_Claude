@@ -1,6 +1,6 @@
 {
   "name": "plan-progress",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Painel de subagentes com o plano do chat acima dos cards: objetivo, fase, checklist, barra de progresso e tempo. Abre sozinho quando um plano ganha itens, e /subagentes abre quando você quiser.",
   "types": "./types/index.d.ts"
 }

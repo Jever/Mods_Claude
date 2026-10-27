@@ -209,6 +209,9 @@ function pickHue() {
 }
 const copy = (hp: Helper): Helper => ({ ...hp, steps: hp.steps.map(st => ({ ...st })) })
 
+/** Ordem de desenho de cada grupo: os subagentes mais recentes no topo. */
+const newestFirst = (a: Helper, b: Helper): number => b.seat - a.seat
+
 async function tick($: EngineInterface) {
   tickN += 1
   await $.state.set(CLOCK, { tick: tickN, now: await $.clock.now() })
@@ -490,9 +493,9 @@ export function registerSubagents(on: On, isOff: () => boolean) {
     // Dentro do card: a borda e o espaçamento tomam 4 colunas, mais o bichinho (PET_W).
     const cw = width - 4 - PET_W
 
-    const running = list.filter(hp => hp.phase === 'working')
-    const finished = list.filter(hp => hp.phase === 'done')
-    const stopped = list.filter(hp => hp.phase === 'failed')
+    const running = list.filter(hp => hp.phase === 'working').sort(newestFirst)
+    const finished = list.filter(hp => hp.phase === 'done').sort(newestFirst)
+    const stopped = list.filter(hp => hp.phase === 'failed').sort(newestFirst)
 
     // Totais do topo: só números que o engine informou.
     const tiles: { label: string; value: string }[] = []
