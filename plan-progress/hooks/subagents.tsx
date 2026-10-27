@@ -1,10 +1,11 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { EngineInterface, On, TurnUsage } from 'claude-code'
 
 import type { Helper, HelperPhase, Step, StepKind } from '../types'
 import { cardBarSvg, CARD_BAR_H } from './cards'
 import { connectorName, splitTool } from './connectors'
 import { findHome } from './home'
 import { FRAMES, hueOf, HUES, petSvg } from './pets'
+import { costOfTokens, priceOf, readModels } from './pricing'
 
 // Cards dos subagentes, portados do helper-desk. O painel abre sozinho quando um
 // novo grupo de subagentes começa; /subagentes abre quando você quiser.
@@ -18,6 +19,8 @@ const VIEW = { plugin: 'plan-progress', key: 'helperView' } as const
 const COST = { plugin: 'plan-progress', key: 'helperCost' } as const
 // Tokens do chat principal, somados turno a turno (os dos subagentes ficam em HELPERS).
 const CHAT_TOKENS = { plugin: 'plan-progress', key: 'chatTokens' } as const
+// Tokens por modelo (thread principal + subagentes), para recalcular o custo com os preços da lista.
+const MODEL_TOKENS = { plugin: 'plan-progress', key: 'modelTokens' } as const
 
 const TICK_MS = 300
 const POLL_MS = 2000
@@ -72,6 +75,8 @@ let home = ''
 let ticker: { cancel: () => void } | null = null
 let poller: { cancel: () => void } | null = null
 const strangers = new Set<string>()
+// Modelos fora da lista de preços já avisados nesta carga (o aviso sai uma vez por modelo).
+const announcedUnknown = new Set<string>()
 
 function toolWords(tool: string, connector: string) {
   const words = tool
@@ -217,12 +222,48 @@ async function tick($: EngineInterface) {
   await $.state.set(CLOCK, { tick: tickN, now: await $.clock.now() })
 }
 
+// Acumula os tokens de um turno (thread principal ou subagente) por modelo, para o custo.
+async function addModelUsage($: EngineInterface, usage: TurnUsage) {
+  const id = usage.model.trim()
+  if (!id) return
+  const { value: modelTokens = {} } = await $.state.get(MODEL_TOKENS)
+  const prev = modelTokens[id] ?? { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
+  modelTokens[id] = {
+    input_tokens: prev.input_tokens + usage.input_tokens,
+    output_tokens: prev.output_tokens + usage.output_tokens,
+    cache_read_input_tokens: prev.cache_read_input_tokens + usage.cache_read_input_tokens,
+    cache_creation_input_tokens: prev.cache_creation_input_tokens + usage.cache_creation_input_tokens,
+  }
+  await $.state.set(MODEL_TOKENS, modelTokens)
+}
+
 async function readCost($: EngineInterface) {
+  if (!home) return
   try {
-    const u = await $.session.usage()
-    await $.state.set(COST, { usd: typeof u.cost?.usd === 'number' ? u.cost.usd : null })
+    const models = await readModels($, home)
+    const { value: modelTokens = {} } = await $.state.get(MODEL_TOKENS)
+    let usd = 0
+    const unknown: string[] = []
+    for (const [id, tokens] of Object.entries(modelTokens)) {
+      const model = priceOf(models, id)
+      if (!model) {
+        unknown.push(id)
+        continue
+      }
+      usd += costOfTokens(tokens, model)
+    }
+    for (const id of unknown) {
+      if (announcedUnknown.has(id)) continue
+      announcedUnknown.add(id)
+      try {
+        $.ui.toast(`Custo parcial: o modelo ${id} não está na lista de preços (~/.claude/mods-state/cost-models.json).`)
+      } catch {
+        // O aviso é só uma dica.
+      }
+    }
+    await $.state.set(COST, { usd: Object.keys(modelTokens).length ? usd : null, unknown })
   } catch {
-    // Sem livro-razão de custo: o card de custo fica escondido.
+    // Sem lista ou sem tokens: o card de custo fica escondido.
   }
 }
 
@@ -391,6 +432,8 @@ function barParts(phase: HelperPhase, w: number, tick: number, seat: number): [s
 /** Na abertura da sessão: registra o comando e carrega o último painel salvo (um reload segue dele). */
 export async function startSubagents($: EngineInterface, isOff: () => boolean) {
   home = await findHome($)
+  // Garante que a lista de preços exista para editar, mesmo antes do primeiro turno.
+  await readModels($, home).catch(() => undefined)
   await $.command.register({ name: 'subagentes', description: 'Abre o painel de subagentes: um card com o andamento de cada um', immediate: true })
   if (!helpers.length) {
     const { value } = await $.state.get(HELPERS)
@@ -465,9 +508,13 @@ export function registerSubagents(on: On, isOff: () => boolean) {
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
     const id = e.agentId
-    if (!id && e.usage) {
-      const { value = 0 } = await $.state.get(CHAT_TOKENS)
-      await $.state.set(CHAT_TOKENS, value + usageTotal(e.usage as unknown as Usage))
+    if (e.usage) {
+      await addModelUsage($, e.usage).catch(() => undefined)
+      if (!id) {
+        const { value = 0 } = await $.state.get(CHAT_TOKENS)
+        await $.state.set(CHAT_TOKENS, value + usageTotal(e.usage))
+      }
+      void readCost($).catch(() => undefined)
     }
     if (id && !isOff() && helpers.some(hp => hp.id === id)) {
       const failed = e.reason === 'error' || e.reason === 'refusal' || e.isAborted
@@ -487,8 +534,9 @@ export function registerSubagents(on: On, isOff: () => boolean) {
     const { value: list = [] } = await $.state.get(HELPERS)
     const { value: clk = { tick: 0, now: 0 } } = await $.state.get(CLOCK)
     const { value: view = { open: [], folded: [] } } = await $.state.get(VIEW)
-    const { value: cost = { usd: null } } = await $.state.get(COST)
+    const { value: cost = { usd: null, unknown: [] } } = await $.state.get(COST)
     const { value: chatTokens = 0 } = await $.state.get(CHAT_TOKENS)
+    const unknownModels = cost.unknown ?? []
     const width = Math.max(32, e.props.bodyColumns)
     // Dentro do card: a borda e o espaçamento tomam 4 colunas, mais o bichinho (PET_W).
     const cw = width - 4 - PET_W
@@ -694,6 +742,11 @@ export function registerSubagents(on: On, isOff: () => boolean) {
               </Box>
             ))}
           </Box>
+        ) : null}
+        {unknownModels.length ? (
+          <Text key="unknown" color={WARN} wrap="wrap" marginBottom={1}>
+            {`Custo parcial: ${unknownModels.join(', ')} sem preço na lista.`}
+          </Text>
         ) : null}
         {list.length ? null : <Text dimColor>Os cards aparecem aqui quando o Claude iniciar um subagente.</Text>}
         {group('running', 'Em execução', running, GOOD, '#ffffff')}

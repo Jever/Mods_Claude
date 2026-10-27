@@ -76,6 +76,14 @@ export type Helper = {
   hue: number
 }
 
+/** Tokens acumulados de um modelo nesta sessão, na grafia do ModelUsage do SDK. */
+export type ModelTokens = {
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens: number
+  cache_creation_input_tokens: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'plan-progress': {
@@ -89,10 +97,12 @@ declare module 'claude-code' {
       helperClock: { tick: number; now: number }
       /** Quais cards mostram a lista completa de passos, e quais grupos estão recolhidos. */
       helperView: { open: string[]; folded: string[] }
-      /** Custo total do chat em dólares, null quando o host não guarda. */
-      helperCost: { usd: number | null }
+      /** Custo total do chat em dólares, recalculado por modelo; null enquanto não há tokens. */
+      helperCost: { usd: number | null; unknown: string[] }
       /** Tokens do chat principal somados por turno (cache incluso), para o card "Tokens totais". */
       chatTokens: number
+      /** Tokens acumulados por modelo (id como o SDK reporta), para calcular o custo. */
+      modelTokens: Record<string, ModelTokens>
       /** Quadro da animação da barra do plano, avança a cada 600 ms. */
       planTick: number
     }

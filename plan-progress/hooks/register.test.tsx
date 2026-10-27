@@ -1,6 +1,7 @@
 import type { On, RenderPropsOf } from 'claude-code'
 import { test, expect, mock, type Engine } from 'claude-code/testing'
 import { homeFrom } from './home'
+import { costOfTokens, priceOf } from './pricing'
 
 // O engine entrega cada caminho ao hook como o sistema escreve: D:\proj\x no Windows, /proj/x no Linux
 // e no macOS. Os discos falsos daqui usam o jeito do Linux, então um caminho do Windows é lido como um deles.
@@ -49,7 +50,6 @@ for (const surface of ['desktop', 'terminal'] as const) {
     noLedger(on)
     on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
     on('command.register', async () => ({ value: undefined }) as never)
-    on('session.usage', async () => ({ value: { startedAt: 0, context: {}, rateLimits: [], cost: { usd: 0.42 } } }) as never)
     on('fs.exists', async () => ({ value: false }) as never)
     on('ui.toast', async () => ({ value: undefined }) as never)
     on('ui.status', async () => ({ value: undefined }) as never)
@@ -88,7 +88,6 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(order, 'most recent on top').toEqual(['Achar as faturas', 'Ler as notas'])
     expect(await v.find({ text: /Passo 1 · Lendo notas\.md/ }), 'Read in words').toBeDefined()
     expect(await v.find({ key: 'head-running' }), 'running group').toBeDefined()
-    expect(await v.find({ text: /\$0\.42/ }), 'chat cost from the engine').toBeDefined()
 
     agents[0]!.status = 'completed'
     agents[1]!.status = 'completed'
@@ -282,4 +281,60 @@ test('fora de ~/.claude, a pasta home é a do sistema', async () => {
   expect(homeFrom('/opt/mods/plan-progress', '/home/test/'), 'Linux').toBe('/home/test')
   expect(homeFrom('D:\\ProjetosPessoais\\Mods_Claude\\plan-progress'), 'sem home do sistema, no Windows').toBe('D:/ProjetosPessoais/Mods_Claude/plan-progress')
   expect(homeFrom('/opt/mods/plan-progress'), 'sem home do sistema, no Linux').toBe('/opt/mods/plan-progress')
+})
+
+// O custo agora sai dos tokens acumulados por modelo, não do custo do engine.
+test('costOfTokens aplica o desconto de cache read', () => {
+  const haiku = { id: 'haiku', label: 'Haiku', usdPorMtokIn: 1.0, usdPorMtokOut: 5.0 }
+  const tokens = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 1_000_000,
+    cache_creation_input_tokens: 0,
+  }
+  expect(Math.abs(costOfTokens(tokens, haiku) - 0.1) < 1e-9).toBe(true)
+})
+
+test('priceOf normaliza o id e desconhece modelos fora da lista', () => {
+  const models = [{ id: 'claude-haiku-4-5-20251001-v1.0', label: 'Haiku', usdPorMtokIn: 1.0, usdPorMtokOut: 5.0 }]
+  expect(priceOf(models, ' claude-haiku-4-5-20251001-v1.0 '), 'espaços').toBeDefined()
+  expect(priceOf(models, 'CLAUDE-HAIKU-4-5-20251001-V1.0'), 'caixa').toBeDefined()
+  expect(priceOf(models, 'outro-modelo'), 'desconhecido').toBeUndefined()
+})
+
+test('o custo do chat é recalculado por modelo', async ($, on) => {
+  const clock = mock.clock(on)
+  noLedger(on)
+  on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('fs.exists', async () => ({ value: false }) as never)
+  on('fs.write', async () => ({ value: undefined }) as never)
+  on('fs.read', async () => ({ value: '' }) as never)
+  on('ui.toast', async () => ({ value: undefined }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+  on('turn.complete', async () => ({ text: '' }) as never)
+  baseBand(on)
+  await $.session.start({ source: 'startup', cwd: '/proj', surface: 'terminal', isInteractive: true } as never)
+
+  const complete = $.turn.complete as unknown as (input: unknown) => Promise<unknown>
+  await complete({
+    turnId: 't1',
+    answer: '',
+    durationMs: 1000,
+    isAborted: false,
+    reason: 'answer',
+    usage: {
+      model: 'claude-haiku-4-5-20251001-v1.0',
+      input_tokens: 1_000_000,
+      output_tokens: 100_000,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
+  })
+  await clock.settle()
+
+  const ui = await mountBand($)
+  // 1M de entrada a $1.00 + 100k de saída a $5.00 = $1.50.
+  expect(await ui.find({ text: /\$1\.50/ }), 'custo por modelo').toBeDefined()
+  await ui.unmount()
 })
