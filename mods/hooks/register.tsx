@@ -2,9 +2,8 @@ import type { EngineInterface, Register } from 'claude-code'
 import { findHome, isWindowsPath, splitDirList } from './home'
 
 // The Mods pane: one row per knowledge-work mod, with an On/Off switch that works
-// in every chat (switches.json). Mods that draw something also get Shown/Hidden,
-// kept as "<name>:hidden": true in the same file. Showing a side pane, or the
-// Refresh panel, also leaves an open request for this chat.
+// in every chat (switches.json). Mods with a side pane also get an Open button
+// that leaves an open request for this chat.
 // The list is found on disk, not typed in: every folder under ~/.claude/mods with a
 // plugin.json and a hooks.json that has "modules", every CLAUDE_CODE_PLUGIN_DIRS
 // folder, and this chat's own ~/.claude/dev-mods/<session id>/ mods.
@@ -18,19 +17,18 @@ const BUTTONS_COLS = 26
 
 const GOOD = '#16a34a'
 
-// hide: has a Shown/Hidden switch. ask: Show also leaves an open request. tip: the slash command.
-type Mod = { name: string; title: string; what: string; pane: boolean; hide: boolean; ask: boolean; tip: string }
+// pane: has a side pane (Open button). tip: the slash command.
+type Mod = { name: string; title: string; what: string; pane: boolean; tip: string }
 // A row in the pane: a known mod or one found on disk. switchable: its source reads switches.json.
 type Row = Mod & { switchable: boolean; chatOnly: boolean }
 
 // Só os mods instalados hoje. Cada um lê o switches.json, então pode ser ligado e desligado aqui.
-// pane: abre um painel (com Open). hide: tem Mostrar/Ocultar. ask: Mostrar também deixa um pedido de abertura.
+// pane: abre um painel (com Open).
 const MODS: readonly Mod[] = [
-  { name: 'cache-keeper', title: 'Cache Keeper', what: 'Countdown to the cold cache, keep warm and Limpar Sessão', pane: false, hide: false, ask: false, tip: '/keepwarm' },
-  { name: 'prompt-enhancer', title: 'Prompt Enhancer', what: 'Rewrites the prompt draft without sending it', pane: false, hide: false, ask: false, tip: '/aprimorar' },
-  { name: 'plan-progress', title: 'Plano e subagentes', what: 'The chat plan and one card per subagent', pane: false, hide: false, ask: false, tip: '/subagentes' },
-  { name: 'chat-inventory', title: 'Chat Inventory', what: 'Connectors, files and skills this chat used', pane: true, hide: true, ask: true, tip: '/inventory to open' },
-  { name: 'screen-share', title: 'Screen-Share Mode', what: 'Hides emails, phones and amounts on screen', pane: false, hide: false, ask: false, tip: '/screen-share to hide private data' },
+  { name: 'cache-keeper', title: 'Cache Keeper', what: 'Countdown to the cold cache, keep warm and Limpar Sessão', pane: false, tip: '/keepwarm' },
+  { name: 'prompt-enhancer', title: 'Prompt Enhancer', what: 'Rewrites the prompt draft without sending it', pane: false, tip: '/aprimorar' },
+  { name: 'plan-progress', title: 'Plano e subagentes', what: 'Plans tab (spec and milestones) and Subagents tab', pane: true, tip: '/planos' },
+  { name: 'screen-share', title: 'Screen-Share Mode', what: 'Hides emails, phones and amounts on screen', pane: false, tip: '/screen-share to hide private data' },
 ]
 
 // Module variables reset on a reload; the switches themselves live in the file.
@@ -90,7 +88,6 @@ async function readSwitches($: EngineInterface) {
 }
 
 const isOff = (json: Record<string, unknown>, name: string) => json[name] === false
-const isHidden = (json: Record<string, unknown>, name: string) => json[`${name}:hidden`] === true
 
 // $.fs.write makes the folders it needs, on every platform.
 async function save($: EngineInterface, json: Record<string, unknown>) {
@@ -107,17 +104,6 @@ async function flip($: EngineInterface, name: string) {
   else delete json[name]
   await save($, json)
   return turnOff
-}
-
-// Hidden is `"<name>:hidden": true`; shown deletes the key.
-async function flipHidden($: EngineInterface, name: string) {
-  const json = await readSwitches($)
-  const key = `${name}:hidden`
-  const hide = !isHidden(json, name)
-  if (hide) json[key] = true
-  else delete json[key]
-  await save($, json)
-  return hide
 }
 
 async function askOpen($: EngineInterface, name: string) {
@@ -227,8 +213,6 @@ async function inspect($: EngineInterface, dir: string, chatOnly: boolean): Prom
     what: known?.what ?? (typeof plugin.description === 'string' ? plugin.description : ''),
     tip: known?.tip ?? commands.join(', '),
     pane: known?.pane ?? false,
-    hide: known?.hide ?? false,
-    ask: known?.ask ?? false,
     switchable: source.includes('switches.json'),
     chatOnly,
   }
@@ -299,7 +283,7 @@ export const register: Register = on => {
       sid = await $.session.id()
       home = await findHome($)
       cache = null
-      await $.command.register({ name: 'mods', description: 'Open the Mods pane: turn each mod on or off, or show or hide it, in every chat', immediate: true })
+      await $.command.register({ name: 'mods', description: 'Open the Mods pane: turn each mod on or off in every chat', immediate: true })
       lastRaw = await readRaw($)
       $.clock.every(POLL_MS, () => {
         void poll($).catch(err => log($, 'poll', err))
@@ -338,34 +322,14 @@ export const register: Register = on => {
     return { element: e.element }
   })
 
-  on('ui.press', { plugin: 'mods', element: /^show-.+$/ }, async ($, e) => {
-    const name = e.element.slice('show-'.length)
-    const mod = (await getRows($)).find(m => m.name === name && m.hide && m.switchable)
-    if (!mod) return { element: e.element }
-    try {
-      if (isOff(await readSwitches($), name)) {
-        await $.state.set(NOTE, `${mod.title} is off. Turn it on first.`)
-        return { element: e.element }
-      }
-      const nowHidden = await flipHidden($, name)
-      if (!nowHidden && mod.ask) await askOpen($, name)
-      await $.state.set(NOTE, `${mod.title} is ${nowHidden ? 'hidden' : 'shown'} in every chat.`)
-    } catch (err) {
-      await log($, `show ${name}`, err)
-      await $.state.set(NOTE, `Could not change ${mod.title}. See ~/.claude/mods-logs/mods.log`)
-    }
-    return { element: e.element }
-  })
-
-  // Open: for a side pane that is On and Shown, asks this chat to open it again.
+  // Open: for a side pane that is On, asks this chat to open it again.
   on('ui.press', { plugin: 'mods', element: /^open-.+$/ }, async ($, e) => {
     const name = e.element.slice('open-'.length)
     const mod = (await getRows($)).find(m => m.name === name && m.pane && m.switchable)
     if (!mod) return { element: e.element }
     try {
-      const json = await readSwitches($)
-      if (isOff(json, name) || isHidden(json, name)) {
-        await $.state.set(NOTE, `${mod.title} is ${isOff(json, name) ? 'off' : 'hidden'}. Turn it on and show it first.`)
+      if (isOff(await readSwitches($), name)) {
+        await $.state.set(NOTE, `${mod.title} is off. Turn it on first.`)
         return { element: e.element }
       }
       await askOpen($, name)
@@ -395,7 +359,6 @@ export const register: Register = on => {
 
     const rows = list.map(m => {
       const off = m.switchable && isOff(json, m.name)
-      const hidden = isHidden(json, m.name)
       const width = m.switchable ? left : cols
       const about = (
         <Box flexDirection="column" width={width}>
@@ -436,20 +399,11 @@ export const register: Register = on => {
           {about}
           <Box flexDirection="row" gap={1}>
             {m.pane ? (
-              off || hidden ? (
+              off ? (
                 <Text dimColor>Open</Text>
               ) : (
                 <Button key={`open-${m.name}`} onPress={noop}>
                   Open
-                </Button>
-              )
-            ) : null}
-            {m.hide ? (
-              off ? (
-                <Text dimColor>{hidden ? 'Hidden' : 'Shown'}</Text>
-              ) : (
-                <Button key={`show-${m.name}`} onPress={noop}>
-                  {hidden ? <Text dimColor>Hidden</Text> : <Text color={GOOD}>Shown</Text>}
                 </Button>
               )
             ) : null}
@@ -471,7 +425,7 @@ export const register: Register = on => {
             </Text>
           ) : null}
           <Text dimColor wrap="wrap">
-            Off means off in every chat. Hidden keeps it on but out of sight. Changes apply within 3 seconds.
+            Off means off in every chat. Changes apply within 3 seconds.
           </Text>
           <Text dimColor wrap="wrap">
             New mods appear here by themselves.

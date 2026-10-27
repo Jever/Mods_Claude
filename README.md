@@ -8,7 +8,7 @@ Cinco mods e uma status line para o Claude Code. Cada mod mexe em uma parte da t
 | [prompt-enhancer](#prompt-enhancer) | 0.3.0 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
 | [plan-progress](#plan-progress) | 0.10.0 | Aba Planos (spec e marcos) e aba Subagentes | `/planos`, `/subagentes` |
 | [screen-share](#screen-share) | 0.2.0 | Mascara e-mails, telefones, valores e nomes na tela | `/screen-share` |
-| [mods](#mods) | 0.4.0 | Painel para ligar e desligar cada mod | `/mods` |
+| [mods](#mods) | 0.5.0 | Painel para ligar e desligar cada mod | `/mods` |
 
 - [Requisitos](#requisitos)
 - [Instalação](#instalacao)
@@ -168,7 +168,6 @@ Data de vencimento: 15/03/2027
 Painel para ligar e desligar cada mod, sem editar arquivos. Abra com `/mods`.
 
 - **On / Off:** desliga o mod em todos os chats. Vale em até 3 segundos.
-- **Shown / Hidden:** para mods que escondem a faixa ou o painel.
 - **Open:** para mods com painel lateral, para abri-lo daqui.
 
 Mods instalados que o painel não conhece aparecem no fim da lista, com o nome do plugin. O painel não se mostra na própria lista.

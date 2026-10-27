@@ -8,10 +8,10 @@ const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:(?=\
 const props = { title: 'Mods', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as never
 
 // Os mods instalados hoje, na ordem da tabela do painel.
-const INSTALLED = ['cache-keeper', 'prompt-enhancer', 'plan-progress', 'chat-inventory', 'screen-share'] as const
+const INSTALLED = ['cache-keeper', 'prompt-enhancer', 'plan-progress', 'screen-share'] as const
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`switches a mod off, and Show opens a side pane (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
+  test(`switches a mod off (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const opened: string[] = []
     const find = (end: string) => Object.keys(files).find(k => k.endsWith(end))
@@ -36,10 +36,8 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const v = await $.ui.mount({ plugin: 'mods', surface, component: 'Pane', requestId: 'mods', props })
     expect(await v.find({ text: 'Cache Keeper' }), 'first row').toBeDefined()
     expect(await v.find({ text: 'Screen-Share Mode' }), 'last row').toBeDefined()
-    expect(await v.find({ text: /Off means off in every chat\. Hidden keeps it on but out of sight\. Changes apply within 3 seconds\./ }), 'footer').toBeDefined()
+    expect(await v.find({ text: /Off means off in every chat\. Changes apply within 3 seconds\./ }), 'footer').toBeDefined()
     expect(await v.find({ text: 'New mods appear here by themselves.' }), 'footer line on new mods').toBeDefined()
-    expect(await v.find({ text: 'Chat Inventory' }), 'Chat Inventory keeps its name').toBeDefined()
-    expect(await v.find({ key: 'show-screen-share' }), 'no Shown/Hidden on screen-share').toBeUndefined()
     expect(await v.find({ text: '/keepwarm' }), 'tip under Cache Keeper').toBeDefined()
     expect(await v.find({ text: '/screen-share to hide private data' }), 'tip under Screen-Share').toBeDefined()
     for (const name of INSTALLED) {
@@ -52,29 +50,11 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(sw, 'switches.json written under the home folder').not.toBe('')
     expect(JSON.parse(files[sw] ?? '{}'), 'cache-keeper off').toEqual({ 'cache-keeper': false })
     expect(await v.find({ text: 'Cache Keeper is off in every chat.' }), 'note after the press').toBeDefined()
-
-    // Chat Inventory: Hide, then Show, which clears the flag and leaves the empty request file for this chat.
-    await v.press({ key: 'show-chat-inventory' })
-    expect(JSON.parse(files[sw] ?? '{}'), 'chat-inventory hidden').toEqual({ 'cache-keeper': false, 'chat-inventory:hidden': true })
-    expect(find('/.claude/mods/.open-chat-inventory-sid-123'), 'no request on Hide').toBeUndefined()
-    await v.press({ key: 'show-chat-inventory' })
-    expect(JSON.parse(files[sw] ?? '{}'), 'chat-inventory shown').toEqual({ 'cache-keeper': false })
-    const ask = find('/.claude/mods/.open-chat-inventory-sid-123') ?? ''
-    expect(ask, 'request file has the session id').not.toBe('')
-    expect(files[ask], 'request file is empty').toBe('')
-
-    // Off: Shown/Hidden cannot be pressed for that mod, and On brings the key back out.
-    await v.press({ key: 'toggle-chat-inventory' })
-    expect(await v.find({ key: 'show-chat-inventory' }), 'no Shown/Hidden button while off').toBeUndefined()
-    expect(await v.find({ key: 'show-cache-keeper' }), 'nor for Cache Keeper, which is off').toBeUndefined()
-    expect(JSON.parse(files[sw] ?? '{}'), 'both off').toEqual({ 'cache-keeper': false, 'chat-inventory': false })
-    await v.press({ key: 'toggle-cache-keeper' })
-    expect(JSON.parse(files[sw] ?? '{}'), 'cache-keeper back on: key removed').toEqual({ 'chat-inventory': false })
   })
 }
 
 for (const surface of ['desktop', 'terminal'] as const) {
-  test(`Shown/Hidden on Chat Inventory flips its hidden key (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
+  test(`Open on a pane mod writes the open request while it is On (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
     const files: Record<string, string> = {}
     const find = (end: string) => Object.keys(files).find(k => k.endsWith(end))
     on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
@@ -87,51 +67,20 @@ for (const surface of ['desktop', 'terminal'] as const) {
 
     await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
     const v = await $.ui.mount({ plugin: 'mods', surface, component: 'Pane', requestId: 'mods', props })
-    await v.press({ key: 'show-chat-inventory' })
-    const sw = find('/.claude/mods/switches.json') ?? ''
-    expect(JSON.parse(files[sw] ?? '{}'), 'hidden key set').toEqual({ 'chat-inventory:hidden': true })
-    expect(await v.find({ text: 'Chat Inventory is hidden in every chat.' }), 'note says hidden').toBeDefined()
-    expect(await v.find({ text: 'Hidden' }), 'the row reads Hidden').toBeDefined()
-    expect(find('/.claude/mods/.open-chat-inventory-sid-123'), 'hiding leaves no open request').toBeUndefined()
-
-    await v.press({ key: 'show-chat-inventory' })
-    expect(JSON.parse(files[sw] ?? '{}'), 'hidden key removed').toEqual({})
-    expect(await v.find({ text: 'Chat Inventory is shown in every chat.' }), 'note says shown').toBeDefined()
-  })
-}
-
-for (const surface of ['desktop', 'terminal'] as const) {
-  test(`Open on a pane mod writes the open request only while it is On and Shown (${surface})`, { timeoutMs: 20000 }, async ($, on) => {
-    const files: Record<string, string> = {}
-    const find = (end: string) => Object.keys(files).find(k => k.endsWith(end))
-    on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
-    on('session.id', async () => ({ value: 'sid-123' }) as never)
-    on('command.register', async () => ({ value: undefined }) as never)
-    mock.clock(on, { now: new Date(2026, 9, 15, 21, 0).getTime() })
-    on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
-    machine(on, files)
-    mock.env(on, {})
-
-    await $.session.start({ source: 'startup', cwd: '/Users/test/vault', surface, isInteractive: true } as never)
-    const v = await $.ui.mount({ plugin: 'mods', surface, component: 'Pane', requestId: 'mods', props })
-    expect(await v.find({ key: 'open-chat-inventory' }), 'Open on chat-inventory').toBeDefined()
+    expect(await v.find({ key: 'open-plan-progress' }), 'Open on plan-progress').toBeDefined()
     expect(await v.find({ key: 'open-cache-keeper' }), 'no Open on a band mod').toBeUndefined()
 
-    await v.press({ key: 'open-chat-inventory' })
-    const ask = find('/.claude/mods/.open-chat-inventory-sid-123') ?? ''
+    await v.press({ key: 'open-plan-progress' })
+    const ask = find('/.claude/mods/.open-plan-progress-sid-123') ?? ''
     expect(ask, 'open request written').not.toBe('')
     expect(files[ask], 'request file is empty').toBe('')
-    expect(await v.find({ text: 'Chat Inventory opens in this chat within 3 seconds.' }), 'note').toBeDefined()
+    expect(await v.find({ text: 'Plano e subagentes opens in this chat within 3 seconds.' }), 'note').toBeDefined()
 
-    // Hidden: Open cannot be pressed.
-    await v.press({ key: 'show-chat-inventory' })
-    expect(await v.find({ key: 'open-chat-inventory' }), 'no Open while hidden').toBeUndefined()
     // Off: Open cannot be pressed.
-    await v.press({ key: 'toggle-chat-inventory' })
-    expect(await v.find({ key: 'open-chat-inventory' }), 'no Open while off').toBeUndefined()
-    await v.press({ key: 'toggle-chat-inventory' })
-    await v.press({ key: 'show-chat-inventory' })
-    expect(await v.find({ key: 'open-chat-inventory' }), 'Open again on an On and Shown mod').toBeDefined()
+    await v.press({ key: 'toggle-plan-progress' })
+    expect(await v.find({ key: 'open-plan-progress' }), 'no Open while off').toBeUndefined()
+    await v.press({ key: 'toggle-plan-progress' })
+    expect(await v.find({ key: 'open-plan-progress' }), 'Open again on an On mod').toBeDefined()
   })
 }
 
@@ -147,9 +96,6 @@ const disk: Record<string, string> = {
   '/.claude/mods/not-a-mod/hooks/hooks.json': JSON.stringify({ hooks: {} }),
   '/.claude/mods/mods/.claude-plugin/plugin.json': JSON.stringify({ name: 'mods' }),
   '/.claude/mods/mods/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
-  '/.claude/mods/chat-inventory/.claude-plugin/plugin.json': JSON.stringify({ name: 'chat-inventory', description: 'long text' }),
-  '/.claude/mods/chat-inventory/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
-  '/.claude/mods/chat-inventory/hooks/register.tsx': "readSwitch('switches.json')",
   '/opt/extra\b/alpha-env/.claude-plugin/plugin.json': JSON.stringify({ name: 'alpha-env', description: 'Found through the env list' }),
   '/opt/extra\b/alpha-env/hooks/hooks.json': JSON.stringify({ modules: ['./register.tsx'] }),
   '/opt/extra\b/alpha-env/hooks/register.tsx': "'switches.json'",
@@ -161,7 +107,7 @@ const disk: Record<string, string> = {
   '/.claude/dev-mods/sid-123/brand-new/hooks/register.tsx': "'switches.json'",
 }
 const dirs: Record<string, string[]> = {
-  '/.claude/mods': ['zeta-notes', 'plain-tool', 'not-a-mod', 'mods', 'chat-inventory'],
+  '/.claude/mods': ['zeta-notes', 'plain-tool', 'not-a-mod', 'mods'],
   '/.claude/dev-mods/sid-123': ['brand-new'],
   '/.claude/plugins/cache': ['anthropic'],
   '/.claude/plugins/cache/anthropic': ['replay-theater'],
@@ -268,14 +214,10 @@ for (const surface of ['desktop', 'terminal'] as const) {
     expect(await v.find({ text: 'Not A Mod' }), 'no modules key, not a mod').toBeUndefined()
     expect(await v.find({ key: 'toggle-mods' }), 'the switchboard skips itself').toBeUndefined()
 
-    // Known ones keep their rows, names and extras; a known name beats the plugin's own description.
-    expect(await v.find({ text: 'Chat Inventory' }), 'chat-inventory keeps its known name').toBeDefined()
-    expect(await v.find({ text: 'long text' }), 'and not its own description').toBeUndefined()
-    expect(await v.find({ key: 'open-chat-inventory' }), 'and its Open button').toBeDefined()
+    // Known ones keep their rows and names.
     expect(await v.find({ key: 'toggle-cache-keeper' }), 'Cache Keeper keeps On/Off').toBeDefined()
-    expect(await v.find({ key: 'show-cache-keeper' }), 'Cache Keeper has no Shown/Hidden').toBeUndefined()
     expect(await v.find({ key: 'toggle-prompt-enhancer' }), 'Prompt Enhancer keeps On/Off').toBeDefined()
-    expect(await v.find({ key: 'show-zeta-notes' }), 'a new mod has no Shown/Hidden').toBeUndefined()
+    expect(await v.find({ key: 'open-plan-progress' }), 'plan-progress keeps its Open button').toBeDefined()
 
     // Order: the installed table, then new ones A to Z, then this chat's own.
     const order = (await v.findAll({ type: 'Box' })).map(b => b.key ?? '').filter(k => k.startsWith('row-')).map(k => k.slice(4))
