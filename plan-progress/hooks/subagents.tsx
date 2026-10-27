@@ -77,6 +77,8 @@ let poller: { cancel: () => void } | null = null
 const strangers = new Set<string>()
 // Modelos fora da lista de preços já avisados nesta carga (o aviso sai uma vez por modelo).
 const announcedUnknown = new Set<string>()
+// Último custo gravado para a status line, para não reescrever o arquivo a cada poll.
+let lastCostKey = ''
 
 function toolWords(tool: string, connector: string) {
   const words = tool
@@ -237,6 +239,19 @@ async function addModelUsage($: EngineInterface, usage: TurnUsage) {
   await $.state.set(MODEL_TOKENS, modelTokens)
 }
 
+// Grava o custo corrigido para a status line ler. Só reescreve quando o valor muda.
+async function syncCostFile($: EngineInterface, usd: number | null, unknown: string[]) {
+  if (!home) return
+  const key = JSON.stringify({ usd, unknown })
+  if (key === lastCostKey) return
+  lastCostKey = key
+  try {
+    await $.fs.write(`${home}/.claude/mods-state/cost-usd.json`, `${JSON.stringify({ usd, unknown }, null, 2)}\n`)
+  } catch {
+    // O arquivo da status line nunca quebra o painel.
+  }
+}
+
 async function readCost($: EngineInterface) {
   if (!home) return
   try {
@@ -261,7 +276,9 @@ async function readCost($: EngineInterface) {
         // O aviso é só uma dica.
       }
     }
-    await $.state.set(COST, { usd: Object.keys(modelTokens).length ? usd : null, unknown })
+    const finalUsd = Object.keys(modelTokens).length ? usd : null
+    await $.state.set(COST, { usd: finalUsd, unknown })
+    await syncCostFile($, finalUsd, unknown)
   } catch {
     // Sem lista ou sem tokens: o card de custo fica escondido.
   }
@@ -434,6 +451,9 @@ export async function startSubagents($: EngineInterface, isOff: () => boolean) {
   home = await findHome($)
   // Garante que a lista de preços exista para editar, mesmo antes do primeiro turno.
   await readModels($, home).catch(() => undefined)
+  // Zera o custo da sessão para a status line, apagando o valor da sessão anterior.
+  lastCostKey = ''
+  await syncCostFile($, null, []).catch(() => undefined)
   await $.command.register({ name: 'subagentes', description: 'Abre o painel de subagentes: um card com o andamento de cada um', immediate: true })
   if (!helpers.length) {
     const { value } = await $.state.get(HELPERS)
