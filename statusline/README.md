@@ -18,11 +18,14 @@ Configuração da status line personalizada do Claude Code. O script desenha a l
      "statusLine": {
        "type": "command",
        "command": "~/.claude/statusline-command.sh",
-       "padding": 0
+       "padding": 0,
+       "refreshInterval": 30
      }
    }
    ```
 
+   O `refreshInterval` (em segundos, mínimo 1) re-roda o script num timer fixo, para o custo atualizar mesmo com a sessão parada. Sem ele, a linha só atualiza em eventos (nova mensagem, /compact etc.).
+
 ## Custo por modelo
 
-O valor de 💰 sai do `~/.claude/mods-state/cost-usd.json`, gravado pelo plan-progress com o custo já calculado por modelo. Sem esse arquivo, o script usa o custo do engine. Um `⚠` indica custo parcial, com modelo fora da lista de preços.
+O valor de 💰 sai do `~/.claude/mods-state/cost-<sessão>.json`, gravado pelo plan-progress com o custo já calculado por modelo daquela sessão. Sem esse arquivo, o script usa o custo do engine. Um `⚠` indica custo parcial, com modelo fora da lista de preços.

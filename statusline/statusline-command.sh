@@ -3,7 +3,8 @@ input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name')
 CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir')
-COST_FILE="$HOME/.claude/mods-state/cost-usd.json"
+SESSION_ID=$(echo "$input" | jq -r '.session_id')
+COST_FILE="$HOME/.claude/mods-state/cost-$SESSION_ID.json"
 COST=$(jq -r 'if (.usd | type) == "number" then .usd else empty end' "$COST_FILE" 2>/dev/null)
 if [ -z "$COST" ]; then
     COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
