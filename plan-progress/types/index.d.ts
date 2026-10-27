@@ -24,12 +24,12 @@ export type TrackedTask = {
 }
 
 /** Progresso lido do ledger de um plano (`.superpowers/sdd/<plano>/progress.md`). */
-export type Ledger = {
-  planPath: string
+export type Milestone = {
+  /** O slug do plano (nome do arquivo sem `.md`). */
+  id: string
   title: string
   tasks: { id: string; title: string; done: boolean }[]
   updatedAt: number
-  seenAt: number
 }
 
 export type HelperPhase = 'working' | 'done' | 'failed'
@@ -90,7 +90,10 @@ declare module 'claude-code' {
       plan: Plan | null
       now: number
       tasks: TrackedTask[]
-      ledger: Ledger | null
+      /** Contador que muda quando os planos/marcos do projeto mudam, para redesenhar a aba. */
+      planVersion: number
+      /** Quais marcos mostram a lista completa de tasks na aba Planos. */
+      planView: { open: string[] }
       /** Subagentes do chat, na ordem de início. */
       helpers: Helper[]
       /** Contador de quadros (bichinhos e giro) e o horário do último tick. */

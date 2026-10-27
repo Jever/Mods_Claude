@@ -72,6 +72,7 @@ let seats = 0
 let nextHue = 0
 let tickN = 0
 let home = ''
+let sid = ''
 let ticker: { cancel: () => void } | null = null
 let poller: { cancel: () => void } | null = null
 const strangers = new Set<string>()
@@ -241,12 +242,12 @@ async function addModelUsage($: EngineInterface, usage: TurnUsage) {
 
 // Grava o custo corrigido para a status line ler. Só reescreve quando o valor muda.
 async function syncCostFile($: EngineInterface, usd: number | null, unknown: string[]) {
-  if (!home) return
+  if (!home || !sid) return
   const key = JSON.stringify({ usd, unknown })
   if (key === lastCostKey) return
   lastCostKey = key
   try {
-    await $.fs.write(`${home}/.claude/mods-state/cost-usd.json`, `${JSON.stringify({ usd, unknown }, null, 2)}\n`)
+    await $.fs.write(`${home}/.claude/mods-state/cost-${sid}.json`, `${JSON.stringify({ usd, unknown }, null, 2)}\n`)
   } catch {
     // O arquivo da status line nunca quebra o painel.
   }
@@ -449,6 +450,7 @@ function barParts(phase: HelperPhase, w: number, tick: number, seat: number): [s
 /** Na abertura da sessão: registra o comando e carrega o último painel salvo (um reload segue dele). */
 export async function startSubagents($: EngineInterface, isOff: () => boolean) {
   home = await findHome($)
+  sid = await $.session.id().catch(() => '')
   // Garante que a lista de preços exista para editar, mesmo antes do primeiro turno.
   await readModels($, home).catch(() => undefined)
   // Zera o custo da sessão para a status line, apagando o valor da sessão anterior.

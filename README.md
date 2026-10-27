@@ -6,7 +6,7 @@ Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat
 | --- | --- | --- | --- |
 | [cache-keeper](#cache-keeper) | 0.2.6 | Contagem até o cache esfriar, Manter aquecido e Limpar Sessão | botões acima do prompt |
 | [prompt-enhancer](#prompt-enhancer) | 0.3.0 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
-| [plan-progress](#plan-progress) | 0.9.2 | Painel com o plano do chat e um card por subagente | `/subagentes`, ou sozinho |
+| [plan-progress](#plan-progress) | 0.10.0 | Aba Planos (spec e marcos) e aba Subagentes | `/planos`, `/subagentes` |
 | [chat-inventory](#chat-inventory) | 0.2.0 | Painel "In this chat": to-do, conectores, arquivos e skills | `/inventory` |
 | [screen-share](#screen-share) | 0.2.0 | Mascara e-mails, telefones, valores e nomes na tela | `/screen-share` |
 | [mods](#mods) | 0.4.0 | Painel para ligar e desligar cada mod | `/mods` |
@@ -129,25 +129,24 @@ Resultado final esperado: o login renova o token sem pedir a senha de novo.
 
 ### plan-progress
 
-Mostra o plano do chat e um card por subagente em um painel lateral chamado **Subagentes**.
+Duas abas no painel lateral: **Planos** e **Subagentes**.
 
-O painel tem três partes.
+A aba **Planos** mostra a spec e os marcos do projeto. Cada marco tem título, barra de progresso, porcentagem e a lista de tasks expansível. O progresso vem de três fontes, e qualquer uma que marque o marco como concluído conta:
 
-1. **Caixa do plano:** objetivo do plano, barra de progresso com degradê, porcentagem, tempo e a lista de tarefas com `✓`, `●` (em andamento) e `○` (pendente).
-2. **Caixas de totais:** Custo do chat, Tokens totais, Tokens dos subagentes e Tempo.
-3. **Cards dos subagentes:** um por subagente, com o nome, o tipo, o modelo, o passo atual, os últimos passos, a barra de atividade e o tempo. Agrupados em Em execução, Concluídos e Interrompidos, com os mais recentes no topo de cada grupo.
+- o roadmap em `docs/superpowers/plans/*roadmap*.md` (coluna "Estado");
+- as branches mescladas no git (`git branch --merged`);
+- os ledgers de ciclo em `.superpowers/sdd/<ciclo>/progress.md`.
 
-O plano vem de três fontes, nesta ordem: o ledger do superpowers em `.superpowers/sdd`, incluindo worktrees; o TodoWrite e o TaskCreate do chat principal; e o arquivo `~/.claude/mods-state/plan-<sessão>.json`, que este mod também grava para o chat-inventory.
+Sem spec e planos do superpowers, a aba cai no plano da sessão (TodoWrite/TaskCreate).
 
-- O painel abre sozinho quando um plano ganha itens, uma vez por plano. Se você fechar, ele não reabre sozinho para o mesmo plano.
-- O painel também abre sozinho quando um subagente começa.
-- `/subagentes` abre quando você quiser.
+A aba **Subagentes** mostra um card por subagente (nome, tipo, modelo, passo atual, últimos passos, barra e tempo), agrupados em Em execução, Concluídos e Interrompidos, mais recentes no topo. Também mostra os totais: Custo do chat, Tokens totais, Tokens dos subagentes e Tempo.
 
-Tokens totais soma o uso do chat principal com o dos subagentes, incluindo leituras de cache. Por isso o número pode passar da janela de contexto.
+- `/planos` abre a aba Planos; `/subagentes` abre a aba Subagentes.
+- As abas abrem sozinhas quando há plano ou subagente.
 
 O **Custo do chat** é calculado pelos tokens de cada modelo e os preços em `~/.claude/mods-state/cost-models.json`, criado na primeira abertura com uma lista inicial. Edite o arquivo para ajustar os valores. Modelos fora da lista saem do total e aparecem como "Custo parcial".
 
-O custo corrigido também é gravado em `~/.claude/mods-state/cost-usd.json`, que a status line personalizada lê (veja `statusline/README.md`).
+O custo corrigido também é gravado em `~/.claude/mods-state/cost-<sessão>.json`, que a status line personalizada lê (veja `statusline/README.md`).
 
 ### chat-inventory
 
