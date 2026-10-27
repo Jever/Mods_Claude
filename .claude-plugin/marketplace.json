@@ -4,8 +4,7 @@
   "plugins": [
     { "name": "cache-keeper", "source": "./cache-keeper", "description": "Botão Limpar Sessão (handoff com briefing) e aviso de qualidade quando o contexto enche." },
     { "name": "prompt-enhancer", "source": "./prompt-enhancer", "description": "Botão Aprimorar acima do prompt: reescreve o rascunho sem enviar." },
-    { "name": "plan-progress", "source": "./plan-progress", "description": "Painel com objetivo, fase, checklist do TodoWrite, barra de progresso e tempo." },
-    { "name": "chat-inventory", "source": "./chat-inventory", "description": "Painel lateral, In this chat, com to-do, conectores, arquivos de contexto e skills usados no chat." },
+    { "name": "plan-progress", "source": "./plan-progress", "description": "Aba Planos (spec e marcos, com progresso do roadmap, git e ledgers) e aba Subagentes (um card por subagente)." },
     { "name": "screen-share", "source": "./screen-share", "description": "/screen-share mascara e-mails, telefones, valores e nomes na tela para gravação, sem alterar os dados lidos pelo Claude." },
     { "name": "mods", "source": "./mods", "description": "Painel /mods para ligar e desligar cada mod em todos os chats, inclusive os instalados de outros marketplaces." }
   ]
