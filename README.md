@@ -6,7 +6,7 @@ Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat
 | --- | --- | --- | --- |
 | [cache-keeper](#cache-keeper) | 0.2.6 | Contagem até o cache esfriar, Manter aquecido e Limpar Sessão | botões acima do prompt |
 | [prompt-enhancer](#prompt-enhancer) | 0.3.0 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
-| [plan-progress](#plan-progress) | 0.9.0 | Painel com o plano do chat e um card por subagente | `/subagentes`, ou sozinho |
+| [plan-progress](#plan-progress) | 0.9.1 | Painel com o plano do chat e um card por subagente | `/subagentes`, ou sozinho |
 | [chat-inventory](#chat-inventory) | 0.2.0 | Painel "In this chat": to-do, conectores, arquivos e skills | `/inventory` |
 | [screen-share](#screen-share) | 0.2.0 | Mascara e-mails, telefones, valores e nomes na tela | `/screen-share` |
 | [mods](#mods) | 0.4.0 | Painel para ligar e desligar cada mod | `/mods` |
@@ -146,6 +146,8 @@ O plano vem de três fontes, nesta ordem: o ledger do superpowers em `.superpowe
 Tokens totais soma o uso do chat principal com o dos subagentes, incluindo leituras de cache. Por isso o número pode passar da janela de contexto.
 
 O **Custo do chat** é calculado pelos tokens de cada modelo e os preços em `~/.claude/mods-state/cost-models.json`, criado na primeira abertura com uma lista inicial. Edite o arquivo para ajustar os valores. Modelos fora da lista saem do total e aparecem como "Custo parcial".
+
+O custo corrigido também é gravado em `~/.claude/mods-state/cost-usd.json`, que a status line personalizada lê (veja `statusline/README.md`).
 
 ### chat-inventory
 
