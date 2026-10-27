@@ -338,3 +338,40 @@ test('o custo do chat é recalculado por modelo', async ($, on) => {
   expect(await ui.find({ text: /\$1\.50/ }), 'custo por modelo').toBeDefined()
   await ui.unmount()
 })
+
+test('um modelo fora da lista não derruba o painel', async ($, on) => {
+  const clock = mock.clock(on)
+  noLedger(on)
+  on('session.start', async ($, e) => ({ cwd: e.cwd }) as never)
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('fs.exists', async () => ({ value: false }) as never)
+  on('fs.write', async () => ({ value: undefined }) as never)
+  on('fs.read', async () => ({ value: '' }) as never)
+  on('ui.toast', async () => ({ value: undefined }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+  on('turn.complete', async () => ({ text: '' }) as never)
+  baseBand(on)
+  await $.session.start({ source: 'startup', cwd: '/proj', surface: 'terminal', isInteractive: true } as never)
+
+  const complete = $.turn.complete as unknown as (input: unknown) => Promise<unknown>
+  await complete({
+    turnId: 't1',
+    answer: '',
+    durationMs: 1000,
+    isAborted: false,
+    reason: 'answer',
+    usage: {
+      model: 'modelo-fora-da-lista',
+      input_tokens: 1_000_000,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
+  })
+  await clock.settle()
+
+  const ui = await mountBand($)
+  expect(await ui.find({ text: /Custo parcial/ }), 'aviso de parcial').toBeDefined()
+  expect(await ui.find({ text: /Nenhum subagente ainda/ }), 'cabeçalho presente').toBeDefined()
+  await ui.unmount()
+})
