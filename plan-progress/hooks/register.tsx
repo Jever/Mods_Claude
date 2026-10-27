@@ -273,8 +273,7 @@ async function planView($: EngineInterface): Promise<Plans | null> {
 let lastPlanKey = ''
 
 /**
- * Grava o plano do chat em `~/.claude/mods-state/plan-<sessão>.json`, o arquivo que o chat-inventory lê
- * para o To-do. O plan-progress é o escritor: ele já coleta o plano de todas as fontes. Nunca lança.
+ * Grava o plano da sessão em `~/.claude/mods-state/plan-<sessão>.json`. Nunca lança.
  */
 async function syncPlanFile($: EngineInterface) {
   if (!sid || !home) return
