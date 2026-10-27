@@ -5,8 +5,8 @@ Seis mods pequenos para o Claude Code. Cada um mexe em uma parte da tela do chat
 | Mod | Versão | O que faz | Como abrir |
 | --- | --- | --- | --- |
 | [cache-keeper](#cache-keeper) | 0.2.6 | Contagem até o cache esfriar, Manter aquecido e Limpar Sessão | botões acima do prompt |
-| [prompt-enhancer](#prompt-enhancer) | 0.2.0 | Reescreve o rascunho do prompt sem enviar | botão Aprimorar, `/aprimorar` |
-| [plan-progress](#plan-progress) | 0.7.2 | Painel com o plano do chat e um card por subagente | `/subagentes`, ou sozinho |
+| [prompt-enhancer](#prompt-enhancer) | 0.3.0 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
+| [plan-progress](#plan-progress) | 0.8.0 | Painel com o plano do chat e um card por subagente | `/subagentes`, ou sozinho |
 | [chat-inventory](#chat-inventory) | 0.2.0 | Painel "In this chat": to-do, conectores, arquivos e skills | `/inventory` |
 | [screen-share](#screen-share) | 0.2.0 | Mascara e-mails, telefones, valores e nomes na tela | `/screen-share` |
 | [mods](#mods) | 0.4.0 | Painel para ligar e desligar cada mod | `/mods` |
@@ -113,6 +113,7 @@ Reescreve o rascunho que você digitou no prompt, sem enviar. Você revisa e env
 
 - **Botão Aprimorar** acima do prompt, ou tecla `a`.
 - **`/aprimorar`** com o rascunho como argumento, ou sem argumento para usar o texto do prompt.
+- **Copia para a área de transferência:** além de preencher a caixa, o resultado é copiado para colar em um bloco de notas ou compartilhar. Um aviso confirma a cópia.
 
 Exemplo ilustrativo. O texto reescrito sai com cinco seções: tarefa, skills sugeridas, contexto do projeto, decisões a confirmar e resultado esperado. Usa o CLAUDE.md, o README e a lista de skills instaladas como contexto. O modelo padrão é `sonnet`, e pode ser trocado na instalação.
 
@@ -134,7 +135,7 @@ O painel tem três partes.
 
 1. **Caixa do plano:** objetivo do plano, barra de progresso com degradê, porcentagem, tempo e a lista de tarefas com `✓`, `●` (em andamento) e `○` (pendente).
 2. **Caixas de totais:** Custo do chat, Tokens totais, Tokens dos subagentes e Tempo.
-3. **Cards dos subagentes:** um por subagente, com o nome, o tipo, o modelo, o passo atual, os últimos passos, a barra de atividade e o tempo. Agrupados em Em execução, Concluídos e Interrompidos.
+3. **Cards dos subagentes:** um por subagente, com o nome, o tipo, o modelo, o passo atual, os últimos passos, a barra de atividade e o tempo. Agrupados em Em execução, Concluídos e Interrompidos, com os mais recentes no topo de cada grupo.
 
 O plano vem de três fontes, nesta ordem: o ledger do superpowers em `.superpowers/sdd`, incluindo worktrees; o TodoWrite e o TaskCreate do chat principal; e o arquivo `~/.claude/mods-state/plan-<sessão>.json`, que este mod também grava para o chat-inventory.
 
