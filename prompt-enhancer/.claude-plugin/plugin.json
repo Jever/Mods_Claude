@@ -1,6 +1,6 @@
 {
   "name": "prompt-enhancer",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Botão Aprimorar acima do prompt: reescreve o rascunho na caixa de prompt sem enviar.",
   "types": "./types/index.d.ts",
   "userConfig": {

@@ -91,8 +91,18 @@ const enhance = async ($: EngineInterface, model: string, draft: string) => {
       $.ui.toast(`Não foi possível aprimorar (${result.reason}).`)
       return
     }
-    const filled = await $.prompt.fill({ text: result.text.trim(), mode: 'replace' })
-    if (!filled.isFilled) $.ui.toast('A caixa de prompt não aceitou o texto agora.')
+    const enhanced = result.text.trim()
+    const filled = await $.prompt.fill({ text: enhanced, mode: 'replace' })
+    if (!filled.isFilled) {
+      $.ui.toast('A caixa de prompt não aceitou o texto agora.')
+      return
+    }
+    const copied = await $.ui.copy({ text: enhanced })
+    if (!copied.isCopied) {
+      $.ui.toast('O texto foi para a caixa, mas não deu para copiá-lo.')
+      return
+    }
+    $.ui.toast('Prompt aprimorado e copiado.')
   } catch (error) {
     $.ui.toast(`Falha ao aprimorar: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
@@ -121,7 +131,7 @@ export const register: Register = (on, options) => {
     if (off) return { text: 'O Prompt Enhancer está desligado. Ligue no /mods.' }
     const draft = e.args.trim() || (await $.prompt.read()).text
     void enhance($, model, draft)
-    return { text: 'Aprimorando o prompt, o resultado vai para a caixa de prompt.' }
+    return { text: 'Aprimorando o prompt, o resultado vai para a caixa de prompt e para a área de transferência.' }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
