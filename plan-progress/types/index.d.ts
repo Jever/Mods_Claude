@@ -70,7 +70,7 @@ export type Helper = {
   turnTokens: number
   /** True depois que o engine informou algum uso. */
   hasUsage: boolean
-  /** Posição no painel, na ordem de início. */
+  /** Índice de início (crescente e único), para a animação da barra e a ordem dos cards. */
   seat: number
   /** Qual das 8 cores de corpo o bichinho usa. */
   hue: number

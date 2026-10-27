@@ -84,6 +84,8 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const v = await $.ui.mount({ plugin: 'plan-progress', surface, component: 'Pane', requestId: 'subagents', props })
     expect(await v.find({ text: /Ler as notas/ }), 'first description').toBeDefined()
     expect(await v.find({ text: /Achar as faturas/ }), 'second description').toBeDefined()
+    const order = (await v.findAll({ type: 'Text', text: /Ler as notas|Achar as faturas/ })).map(el => el.text)
+    expect(order, 'most recent on top').toEqual(['Achar as faturas', 'Ler as notas'])
     expect(await v.find({ text: /Passo 1 · Lendo notas\.md/ }), 'Read in words').toBeDefined()
     expect(await v.find({ key: 'head-running' }), 'running group').toBeDefined()
     expect(await v.find({ text: /\$0\.42/ }), 'chat cost from the engine').toBeDefined()
