@@ -764,9 +764,11 @@ export function registerSubagents(on: On, isOff: () => boolean) {
           </Box>
         ) : null}
         {unknownModels.length ? (
-          <Text key="unknown" color={WARN} wrap="wrap" marginBottom={1}>
-            {`Custo parcial: ${unknownModels.join(', ')} sem preço na lista.`}
-          </Text>
+          <Box key="unknown" marginBottom={1}>
+            <Text color={WARN} wrap="wrap">
+              {`Custo parcial: ${unknownModels.join(', ')} sem preço na lista.`}
+            </Text>
+          </Box>
         ) : null}
         {list.length ? null : <Text dimColor>Os cards aparecem aqui quando o Claude iniciar um subagente.</Text>}
         {group('running', 'Em execução', running, GOOD, '#ffffff')}
