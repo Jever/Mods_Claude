@@ -5,7 +5,7 @@ Cinco mods e uma status line para o Claude Code. Cada mod mexe em uma parte da t
 | Mod | Versão | O que faz | Como abrir |
 | --- | --- | --- | --- |
 | [cache-keeper](#cache-keeper) | 0.2.6 | Contagem até o cache esfriar, Manter aquecido e Limpar Sessão | botões acima do prompt |
-| [prompt-enhancer](#prompt-enhancer) | 0.3.0 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
+| [prompt-enhancer](#prompt-enhancer) | 0.3.1 | Reescreve o rascunho do prompt sem enviar e copia para a área de transferência | botão Aprimorar, `/aprimorar` |
 | [plan-progress](#plan-progress) | 0.10.0 | Aba Planos (spec e marcos) e aba Subagentes | `/planos`, `/subagentes` |
 | [screen-share](#screen-share) | 0.2.0 | Mascara e-mails, telefones, valores e nomes na tela | `/screen-share` |
 | [mods](#mods) | 0.5.0 | Painel para ligar e desligar cada mod | `/mods` |
