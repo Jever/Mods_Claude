@@ -70,14 +70,14 @@ for (const surface of ['desktop', 'terminal'] as const) {
     await clock.settle()
     await clock.advance(30_000)
     let v = await $.ui.mount({ plugin: 'cache-keeper', surface, component: 'AbovePrompt', props })
-    expect(await v.find({ text: /Cache\ aquecido/ }), 'countdown with time left').toBeDefined()
+    expect(await v.find({ text: /Cache\ \d+:\d\d/ }), 'countdown with time left').toBeDefined()
     expect(await v.find({ text: /4:30/ }), '4:30 left after 30 s of a 5 min cache').toBeDefined()
     expect(await v.find({ key: 'keepwarm' }), 'keep warm offered').toBeDefined()
     expect(await v.find({ key: 'handoff' }), 'Limpar Sessão still there').toBeDefined()
 
     await clock.advance(5 * 60_000)
     v = await $.ui.mount({ plugin: 'cache-keeper', surface, component: 'AbovePrompt', props })
-    expect(await v.find({ text: /Frio há menos de 1 min/ }), 'cold just after 5 min').toBeDefined()
+    expect(await v.find({ text: /Frio há <1 min/ }), 'cold just after 5 min').toBeDefined()
     expect(await v.find({ key: 'handoff' }), 'Limpar Sessão on a cold chat').toBeDefined()
   })
 }
