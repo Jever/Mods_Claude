@@ -141,7 +141,7 @@ export const register: Register = (on, options) => {
     const below = await next(e)
 
     return (
-      <Box>
+      <Box flexDirection="row">
         {below}
         <Button
           key="enhance"
