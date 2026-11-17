@@ -97,7 +97,7 @@ Reinicie o Claude Code depois. A atualização só vale após o reinício.
 
 Mostra acima do prompt quanto tempo falta até o cache do chat esfriar. O cache é o que deixa a próxima mensagem barata. Depois de esfriar, a próxima mensagem relê o chat inteiro pelo preço cheio.
 
-- **Contagem:** `◷ Cache aquecido 3:12` com uma barra que esvazia. Ao esfriar, mostra `❄ Frio há 7 min`. A duração (5 minutos ou 1 hora) vem do que o Claude gravou nas respostas do chat. Até a primeira resposta, o mod assume 5 minutos.
+- **Contagem:** `◷ Cache 3:12` com uma barra que esvazia. Ao esfriar, mostra `❄ Frio há 7 min`. A duração (5 minutos ou 1 hora) vem do que o Claude gravou nas respostas do chat. Até a primeira resposta, o mod assume 5 minutos.
 - **Manter aquecido:** manda um ping pequeno cerca de 45 segundos antes de o cache esfriar. Para sozinho depois de 30 pings, depois de 2 horas, ou quando você envia uma mensagem. Também pelo comando `/keepwarm` e `/keepwarm off`.
 - **Limpar Sessão:** gera um briefing do chat, limpa a sessão e cola o briefing no prompt para você continuar em um chat limpo. Também pelo comando `/handoff`. `/handoff colar` recola o último briefing.
 - **Handoff automático:** `/autohandoff 75` faz o handoff sozinho quando o contexto chega a 75%. `/autohandoff off` desliga.
@@ -209,7 +209,7 @@ Se você usa o superpowers, os skills `writing-plans` e `executing-plans` automa
 
 - **Não aparece nada acima do prompt:** confira no `/mods` se o mod está On. Depois rode `/reload-plugins`.
 - **O painel não abre sozinho:** o terminal pode estar com menos de 144 colunas. Use `/planos` ou `/subagentes`.
-- **O cache não mostra contagem:** é preciso ter pelo menos uma resposta do Claude no chat. Antes disso aparece `◷ Cache ainda não`.
+- **O cache não mostra contagem:** é preciso ter pelo menos uma resposta do Claude no chat. Antes disso aparece `◷ Sem cache`.
 - **A contagem mostra 5 minutos mesmo com assinatura:** o mod só mostra o que o Claude gravou no chat. Se as respostas gravaram cache de 5 minutos, a contagem fica em 5. Dá para conferir no log `~/.claude/mods-logs/cache-keeper.log`, e em `~/.claude/projects/` nas linhas `ephemeral_1h_input_tokens` e `ephemeral_5m_input_tokens`.
 - **`python3` não encontrado:** o cache-keeper continua funcionando, mas assume cache de 5 minutos. Instale o `python3` e reinicie o Claude Code.
 - **A aba Planos está vazia ou com marcos zerados:** o projeto não tem os arquivos que a aba lê (spec, roadmap, planos e ledgers), ou eles estão desatualizados. Veja [Acompanhamento de planos](#acompanhamento-de-planos).

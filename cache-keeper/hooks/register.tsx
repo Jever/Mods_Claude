@@ -13,7 +13,7 @@ const BRIEF_KEY = 'lastBrief'
 
 const FIVE_MIN = 5 * 60_000
 const ONE_HOUR = 60 * 60_000
-const BAR = 20
+const BAR = 8
 
 // Manter aquecido: um ping pequeno cerca de 45 s antes de o cache esfriar.
 // $.model.fork repete a última requisição da thread principal (mesmo modelo, prompt
@@ -419,11 +419,11 @@ export const register: Register = (on, options) => {
 
     // Uma linha: o que já está acima do prompt (Aprimorar), os botões e, à direita de todos, a contagem.
     // Larguras fixas por texto preenchido, para a contagem e os rótulos não empurrarem uns aos outros.
-    const TIMER_W = 24
+    const TIMER_W = 16
     const BAR_W = BAR
     const turning = working || e.props.isWorking
     const left = c && c.lastEnd ? c.lastEnd + c.ttlMs - c.now : 0
-    let timer = '◷ Cache ainda não'
+    let timer = '◷ Sem cache'
     let timerColor: string | undefined
     let filled = 0
     if (turning) {
@@ -432,11 +432,11 @@ export const register: Register = (on, options) => {
       const share = left / c.ttlMs
       filled = Math.max(1, Math.round(share * BAR_W))
       timerColor = left <= 60_000 ? BAD : share < 0.5 ? WARN : GOOD
-      timer = `◷ Cache aquecido ${mmss(left)}`
+      timer = `◷ Cache ${mmss(left)}`
     } else if (c && c.lastEnd) {
       timerColor = COLD
       const minutes = Math.floor(-left / 60_000)
-      timer = minutes < 1 ? '❄ Frio há menos de 1 min' : `❄ Frio há ${minutes} min`
+      timer = minutes < 1 ? '❄ Frio há <1 min' : `❄ Frio há ${minutes} min`
     }
 
     const timerCell = timer.padEnd(TIMER_W).slice(0, TIMER_W)
